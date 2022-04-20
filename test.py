@@ -8,7 +8,6 @@ from imProcessing import ImProcessing
 
 # %%
 
-
 def prueba1():
 
     im = cv2.imread('Images/coin.jpg')
