@@ -115,22 +115,19 @@ class ImProcessing:
             # Dibujamos los circulos en la máscara
             x, y, r = i
             x, y, r = int(x), int(y), int(r)
+            r = min(x,y,width-x,height-y, r)
 
             cv2.circle(mask, (x,y), r, (255, 255, 255),
                        thickness=-1)
 
             # {DEBUG} Dibujamos los circulos seleccionados
-            # cv2.circle(gray,  (x,y), r, (0, 255, 0),
-            #            thickness=2)
+            cv2.circle(gray,  (x,y), r, (0, 255, 0),
+                       thickness=2)
 
             # Aplicamos la máscara
             masked_data = cv2.bitwise_and(img, img, mask=mask)
 
             # -- Ajustamos la imagen al circulo --
-            x, y, r = i
-            x = int(x)
-            y = int(y)
-            r = int(r)
             cropped = masked_data[y-r:y+r, x-r:x+r]
             cropped = cv2.resize(cropped, (256, 256))
             imgs.append(cropped)
@@ -139,7 +136,7 @@ class ImProcessing:
             # cv2.imshow("final", cropped)
             # cv2.waitKey(0)
             plt.subplot(222)
-            plt.imshow(cropped,'gray')
+            plt.imshow(gray)
 
             if not multiple:
                 break
