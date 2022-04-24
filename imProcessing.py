@@ -1,3 +1,4 @@
+import re
 import matplotlib.pyplot as plt
 import numpy as np
 import cv2
@@ -17,27 +18,52 @@ class ImProcessing:
         img = cv2.normalize(img, None, alpha=0, beta=255,
                             norm_type=cv2.NORM_MINMAX)
         # self.increaseContrast(cv2.cvtColor(img,cv2.COLOR_GRAY2BGR))
-
         images = self.cropCircle(img, ncoins)   # Separa y recorta cada moneda
 
-        data = []
+        # Diccionario de listas de datos para exportar al archivo csv
+        data = {"ID": [],
+                "HU_1": [],
+                "HU_2": [],
+                "OCR_1": [],
+                "OCR_2": [],
+                "OCR_3": [],
+                }
+
+        img = img_path.split('/')[-1]
+        # Si hay multiples monedas en la imagen debe estar indicado con M
+        if img[0] == 'M':
+            id = int(img.split('_')[1])
+        else:
+            id = int(img.split('_')[0])
 
         # Si hay varias monedas en una misma imagen procesamos todas
         for image in images if ncoins > 1 else images[:1]:
-
             # copy = image.copy()
             # copy = cv2.Canny(copy,50,100)
-
             ocr_data = self.getOCR(image)   # Lectura de caracteres
-            Hu = self.huMoments(image)      # Obtenemos los momentos de Hu
-            keyP = self.keyPoints(image)    # Obtenemos las esquinas
+            # Ajustamos el tamaño
+            resized = cv2.resize(image, (256, 256))
+            Hu = self.huMoments(resized)      # Obtenemos los momentos de Hu
+            keyP = self.keyPoints(resized)    # Obtenemos las esquinas
             # areas = self.getAreas(image)  # Detectamos formas y sus areas
 
-            # Guardamos los datos obtenidos en una tupla
-            data.append((image, ocr_data, Hu, keyP))
+            # Guardamos los datos obtenidos en el diccionario
+            data.get("ID").append(id)
+
+            # Añade las tres primeras palabras (si las hay) detectadas por ocr
+            nocr = 0
+            for i, ocr in zip(range(3), ocr_data):
+                data.get(f"OCR_{i+1}").append(ocr)
+                nocr = i+1
+            # Si no las marca como vacias
+            for i in range(nocr, 3):
+                data.get(f"OCR_{i+1}").append("")
+
+            data.get("HU_1").append(Hu[0])
+            data.get("HU_2").append(Hu[1])
             # cv2.waitKey(0)
             # cv2.destroyAllWindows()
-            plt.show()
+            # plt.show()
 
         return data
 
@@ -83,8 +109,8 @@ class ImProcessing:
         print(f"Detectados {len(circles[0,:])} Circulos")
 
         # Obtenemos la mediana de los radios
-        mediana = np.median(circles[0, :, 2])
-        print(f"Mediana: {mediana}")
+        # mediana = np.median(circles[0, :, 2])
+        # print(f"Mediana: {mediana}")
 
         imgs = []
         # Pasamos a escala BGR para pocer marcar la imagen con colores
@@ -98,9 +124,9 @@ class ImProcessing:
             r = min(x, y, width-x, height-y, r)
 
             # Borra circulos de tamaño desproporcionado
-            if (r > mediana*1.35 or r < mediana*0.35) and idx < len(circles[0, :]):
-                # print(f'Borra circulo: x={x} y={y} r={r}')
-                continue
+            # if (r > mediana*1.35 or r < mediana*0.35) and idx < len(circles[0, :]):
+            #     # print(f'Borra circulo: x={x} y={y} r={r}')
+            #     continue
 
             # Dibujamos el circulo en la máscara
             cv2.circle(mask, (x, y), r, (255, 255, 255),
@@ -110,8 +136,6 @@ class ImProcessing:
 
             # Ajustamos la imagen al circulo
             cropped = masked_data[y-r:y+r, x-r:x+r]
-            # Ajustamos el tamaño
-            cropped = cv2.resize(cropped, (256, 256))
             # Añadimos a la lista de monedas en la imagen
             imgs.append(cropped)
 
@@ -138,22 +162,24 @@ class ImProcessing:
         output = reader.readtext(img)
 
         textos = []
-        # -- DEBUG --
-        #  Muestra  donde detecto los caracteres
         copy = cv2.cvtColor(img.copy(), cv2.COLOR_GRAY2BGR)
         for tupla in output:
             cord = tupla[0]
 
+            # -- DEBUG --
+            #  Muestra  donde detecto los caracteres
             x_min, y_min = [int(min(idx)) for idx in zip(*cord)]
             x_max, y_max = [int(max(idx)) for idx in zip(*cord)]
             cv2.rectangle(copy, (x_min, y_min),
                           (x_max, y_max), (255, 0, 0), 2)
+            # -------------
 
-            textos.append(tupla[1])
+            if tupla[-1] > .7:
+                textos.append(tupla[1])
 
         plt.subplot(246)
         plt.imshow(copy)
-        # -------------
+
         return textos
 
     @staticmethod

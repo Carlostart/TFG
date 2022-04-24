@@ -136,24 +136,33 @@ def addCoins(args):
             key_value = atb.split(":")
             info_dict.update({key_value[0]: key_value[1]})
 
+        # Diccionario para introducir en el archivo csv
+        data = {"ID": [],
+                "HU_1": [],
+                "HU_2": [],
+                "OCR_1": [],
+                "OCR_2": [],
+                "OCR_3": [],
+                }
+
         # Extraemos datos de todas la imagenes especificadas
-        to_csv = []  # Lista de filas para introducir en el archivo csv
         for pth in imgs:
-            # Si hay multiples monedas en la imagen debe estar indicado con M
+            # Obtenemos el nombre del archivo
             img = pth.split('/')[-1]
-            # Si se espacifica que hayan multiples monedas en la imagen
+            # Si hay multiples monedas en la imagen debe estar indicado con M
             if img[0] == 'M':
                 # Leemos la ID y el numero de monedas especificados
-                id = int(img.split('_')[1][:])
                 nc = int(img.split('_')[0][1:])
-
                 # Introducimos los datos obtenidos a la lista
-                to_csv += getData(pth, ncoins=nc, id=id)
+                d = ImProcessing.extractData(pth, nc)
             else:
-                to_csv += getData(pth, id=int(img.split('_')[0]))
+                d = ImProcessing.extractData(pth)
+
+            for k in data:
+                data[k] += d[k]
 
         # Escribimos los datos en el archivo csv
-        writeCSV(to_csv)
+        writeCSV(data)
         # -- POR COMPLETAR --
 
     except cv2.error:  # Tratamos cuando no encuentra el archivo
@@ -162,33 +171,14 @@ def addCoins(args):
         print("Error: Seguir formato -> PATH_1,PATH_2,...PATH_N{Info}")
 
 
-def getData(img, id, ncoins=1):
-    data = []  # Lista de datos
-    # Extraemos datos de la moneda
-    data += ImProcessing.extractData(img, ncoins)
-
-    to_csv = []
-    # Procesamos los datos obtenidos de cada moneda
-    for d in data:
-        ocr, hu, keyp = d[1], d[2], d[3]
-        # row sigue este formato ['ID', 'OCR_1', 'OCR_2', 'OCR_3', 'HU_1', 'HU_2']
-        row = [str(id)]
-        row += ocr[:min(len(ocr), 3)]
-        for i in range(len(row), 4):
-            row.append('')
-        row += str(hu[0]), str(hu[1])
-        to_csv.append(row)
-
-    return to_csv
-
-
-def writeCSV(to_csv):
+def writeCSV(data):
     # Introduce los datos en file_csv
     with open(file_csv, mode='w') as f:
-        csvwriter = csv.writer(f)
-        # Fila de atributos
-        csvwriter.writerow(col_list)  # Fila de atributos
-        csvwriter.writerows(to_csv)  # Filas de datos
+        writer = csv.writer(f)
+        # Atributos
+        writer.writerow(data.keys())
+        # Valores
+        writer.writerows(zip(*data.values()))
 
 
 def invalidCommand(_):
