@@ -141,17 +141,9 @@ def addCoins(args):
             key_value = atb.split(":")
             info_dict.update({key_value[0]: key_value[1]})
 
-        # Diccionario para introducir en el archivo csv
-        data = {"ID": [],
-                "HU_1": [],
-                "HU_2": [],
-                "OCR_1": [],
-                "OCR_2": [],
-                "OCR_3": [],
-                }
-
         # Extraemos datos de todas la imagenes especificadas
-        for pth in imgs:
+        data = None
+        for i, pth in enumerate(imgs):
             if os.path.isdir(pth):
                 imgs.remove(pth)
                 # Introducimos todos los ficheros de la carpeta junto con su path a la lists
@@ -170,8 +162,11 @@ def addCoins(args):
             else:
                 d = ImProcessing.extractData(pth)
 
-            for k in data:
-                data[k] += d[k]
+            if i == 0:
+                data = d
+            else:
+                for k in d:
+                    data[k] += d[k]
 
         # Escribimos los datos en el archivo csv
         writeCSV(data)

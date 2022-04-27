@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import easyocr
 from difflib import SequenceMatcher as SM
 import pandas
+from torch import maximum
 
 IM_SIZE_ADJ = 255
 
@@ -27,7 +28,7 @@ KP_QUALITY = 0.1
 KP_MINDIST = 5
 
 with open("coin_words.txt", 'r') as f:
-    COIN_WORDS = f.readlines()
+    COIN_WORDS = set(f.readlines())
 
 
 class ImProcessing:
@@ -48,12 +49,12 @@ class ImProcessing:
         # Diccionario de listas de datos para exportar al archivo csv
         data = {"ID": [],
                 "HU_1": [],
-                "HU_2": [],
-                "OCR_1": [],
-                "OCR_2": [],
-                "OCR_3": [],
+                "HU_2": []
                 }
+        for word in COIN_WORDS:
+            data.update({f"OCR_{word[:-1]}": []})
 
+        # Obtenemos el nombre del archivo
         img = img_path.split('\\')[-1]
         # Si hay multiples monedas en la imagen debe estar indicado con M
         if img[0] == 'M':
@@ -74,18 +75,16 @@ class ImProcessing:
 
             # Guardamos los datos obtenidos en el diccionario
             data.get("ID").append(id)
-
-            # Añade las tres primeras palabras (si las hay) detectadas por ocr
-            nocr = 0
-            for i, ocr in zip(range(3), ocr_data):
-                data.get(f"OCR_{i+1}").append(ocr)
-                nocr = i+1
-            # Si no las marca como vacias
-            for i in range(nocr, 3):
-                data.get(f"OCR_{i+1}").append("")
-
             data.get("HU_1").append(Hu[0])
             data.get("HU_2").append(Hu[1])
+
+            for word in COIN_WORDS:
+                m = 0
+                for ocr in ocr_data:
+                    aux = SM(None, word[:-1], ocr).ratio()
+                    m = max(m, aux)
+                data.get(f"OCR_{word[:-1]}").append(m)
+
             # cv2.waitKey(0)
             # cv2.destroyAllWindows()
             # plt.show()
