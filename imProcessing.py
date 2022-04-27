@@ -5,6 +5,27 @@ import cv2
 import easyocr
 import pandas
 
+IM_SIZE_ADJ = 255
+
+GAUSS_KERNEL = (19, 19)
+GAUSS_SIGMA = 5
+
+CANNY_TRHES1 = 50
+CANNY_TRHES2 = 100
+
+HCIRCLES_DP = 4
+HCIRCLES_PAR1 = 50
+HCIRCLES_PAR2 = 100
+HCIRCLES_MINRAD = 127
+
+OCR_MINRATE = 0.7
+
+N_HUMOMS = 2
+
+KP_MAXCORNERS = 10
+KP_QUALITY = 0.1
+KP_MINDIST = 5
+
 
 class ImProcessing:
 
@@ -42,7 +63,7 @@ class ImProcessing:
             # copy = cv2.Canny(copy,50,100)
             ocr_data = self.getOCR(image)   # Lectura de caracteres
             # Ajustamos el tamaño
-            resized = cv2.resize(image, (256, 256))
+            resized = cv2.resize(image, (IM_SIZE_ADJ, IM_SIZE_ADJ))
             Hu = self.huMoments(resized)      # Obtenemos los momentos de Hu
             keyP = self.keyPoints(resized)    # Obtenemos las esquinas
             # areas = self.getAreas(image)  # Detectamos formas y sus areas
@@ -89,11 +110,11 @@ class ImProcessing:
         #   Creamos una copia de la imagen para modificar
         gray = img.copy()
         #   Aplicamos un suavizado para eliminar ruidos
-        gray = cv2.GaussianBlur(img, (19, 19), 5)
+        gray = cv2.GaussianBlur(img, GAUSS_KERNEL, GAUSS_SIGMA)
         # Aumentamos las diferencias de intensidades para marcar mejor los bordes
         gray = gray*2
 
-        edges = cv2.Canny(gray, 50, 100)
+        edges = cv2.Canny(gray, CANNY_TRHES1, CANNY_TRHES2)
 
         # -- {DEBUG} --
         plt.subplot(241)
@@ -102,8 +123,8 @@ class ImProcessing:
         # -------------
 
         #   Obtenemos los circulos
-        circles = cv2.HoughCircles(edges, cv2.HOUGH_GRADIENT, 4,
-                                   255, param1=50, param2=100, minRadius=127, maxRadius=0)
+        circles = cv2.HoughCircles(edges, cv2.HOUGH_GRADIENT, HCIRCLES_DP, minDist=IM_SIZE_ADJ,
+                                   param1=HCIRCLES_PAR1, param2=HCIRCLES_PAR2, minRadius=HCIRCLES_MINRAD, maxRadius=0)
 
         # Muestra cuantos circulos se han encontrado
         print(f"Detectados {len(circles[0,:])} Circulos")
@@ -174,7 +195,8 @@ class ImProcessing:
                           (x_max, y_max), (255, 0, 0), 2)
             # -------------
 
-            if tupla[-1] > .7:
+            # Si el indice de acierto es > 70%
+            if tupla[-1] > OCR_MINRATE:
                 textos.append(tupla[1])
 
         plt.subplot(246)
@@ -187,13 +209,14 @@ class ImProcessing:
         # Calculamos los momentos estadisticos hasta los de primera orden
         M = cv2.moments(img, False)
         # Calculamos los momentos de Hu y nos quedamos con los dos primeros
-        Hm = cv2.HuMoments(M).flatten()[0:2]
+        Hm = cv2.HuMoments(M).flatten()[0:N_HUMOMS]
         return Hm
 
     @staticmethod
     def keyPoints(img):
         # Detección de esquinas
-        dst1 = cv2.goodFeaturesToTrack(np.float32(img), 25, 0.1, 10)
+        dst1 = cv2.goodFeaturesToTrack(np.float32(
+            img), KP_MAXCORNERS, KP_QUALITY, KP_MINDIST)
         # Marcamos los puntos en la imagen para mostrarla
         kp = cv2.cvtColor(img.copy(), cv2.COLOR_GRAY2BGR)
         for corner in dst1:
