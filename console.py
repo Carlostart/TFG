@@ -20,10 +20,11 @@ def readPaths():
             lines = f.readlines()
             coin_imgs = []  # Lista de paths de imagenes
             for p in lines:
-                # Si acaba en '/' o '\' es una carpeta
-                if p[-2] == '/' or p[-2] == '\\':
+                # Si acaba es direcctorio
+                if os.path.isdir(p[:-1]):
                     # Introducimos todos los ficheros de la carpeta junto con su path a la lists
-                    coin_imgs += map(p[:-1].__add__, os.listdir(p[:-1]))
+                    coin_imgs += [os.path.join(p[:-1], file)
+                                  for file in os.listdir(p[:-1])]
                 else:
                     # Introducimos el archivo a la lista
                     coin_imgs.append(p[:-1])
@@ -80,8 +81,16 @@ def findCoins(coin_imgs):
     # Buscamos todas las monedas
     for pth in coin_imgs:
         try:
-            # Si hay multiples monedas en la imagen debe estar indicado con M
-            img = pth.split('/')[-1]
+            # Si acaba es direcctorio
+            if os.path.isdir(pth):
+                coin_imgs.remove(pth)
+                # Introducimos todos los ficheros de la carpeta junto con su path a la lists
+                coin_imgs += [os.path.join(pth, file)
+                              for file in os.listdir(pth)]
+                continue
+
+            # Obtenemos el nombre del archivo
+            img = pth.split('\\')[-1]
             # Si se espacifica que hayan multiples monedas en la imagen
             if img[0] == 'M':
                 # Leemos el numero de monedas especificados
@@ -101,11 +110,7 @@ def findCoin(img, ncoins=1):
 
     # -- DEBUG --
     # Imprime los datos por pantalla
-    for d in data:
-        ocr, hu, keyp = d[1], d[2], d[3]
-        print(f'OCR: {ocr}')
-        print(f'Hu: {hu}')
-        print(f'KeyP: {keyp}')
+    print(data)
 
     # -- POR COMPLETAR --
     # Añadir identificacion por aprendizaje
@@ -147,8 +152,15 @@ def addCoins(args):
 
         # Extraemos datos de todas la imagenes especificadas
         for pth in imgs:
+            if os.path.isdir(pth):
+                imgs.remove(pth)
+                # Introducimos todos los ficheros de la carpeta junto con su path a la lists
+                imgs += [os.path.join(pth, file)
+                         for file in os.listdir(pth)]
+                continue
+
             # Obtenemos el nombre del archivo
-            img = pth.split('/')[-1]
+            img = pth.split('\\')[-1]
             # Si hay multiples monedas en la imagen debe estar indicado con M
             if img[0] == 'M':
                 # Leemos la ID y el numero de monedas especificados

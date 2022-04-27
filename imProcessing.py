@@ -1,8 +1,8 @@
-import re
-import matplotlib.pyplot as plt
-import numpy as np
 import cv2
+import numpy as np
+import matplotlib.pyplot as plt
 import easyocr
+from difflib import SequenceMatcher as SM
 import pandas
 
 IM_SIZE_ADJ = 255
@@ -26,11 +26,15 @@ KP_MAXCORNERS = 10
 KP_QUALITY = 0.1
 KP_MINDIST = 5
 
+with open("coin_words.txt", 'r') as f:
+    COIN_WORDS = f.readlines()
+
 
 class ImProcessing:
 
     @classmethod
     def extractData(self, img_path, ncoins=1):
+
         print(f"Identificando imagen: {img_path}")
         img = cv2.imread(img_path)  # Lee imagen
         # -- Ajustes de imagen para que sigan un mismo formato --
@@ -50,7 +54,7 @@ class ImProcessing:
                 "OCR_3": [],
                 }
 
-        img = img_path.split('/')[-1]
+        img = img_path.split('\\')[-1]
         # Si hay multiples monedas en la imagen debe estar indicado con M
         if img[0] == 'M':
             id = int(img.split('_')[1])
