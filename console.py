@@ -1,22 +1,17 @@
-from audioop import error
 import traceback
-import pandas as pd
 from imProcessing import ImProcessing
 import sys
 import os
 import csv
 import cv2
-
-file_paths = "path_to_data.txt"
-file_csv = "DataSet.csv"
-col_list = ['ID', 'OCR_1', 'OCR_2', 'OCR_3', 'HU_1', 'HU_2']
+import dataProcessing as dp
 
 
 def readPaths():
 
     try:
         # Leemos el fichero con los paths
-        with open(file_paths, 'r') as f:
+        with open(dp.FILE_PATHS, 'r') as f:
             lines = f.readlines()
             coin_imgs = []  # Lista de paths de imagenes
             for p in lines:
@@ -37,7 +32,7 @@ def readPaths():
 
 def writePaths(paths, mode='w'):
     # Escribe en el fichero todos los paths de archivos o carpetas
-    with open(file_paths, mode) as f:
+    with open(dp.FILE_PATHS, mode) as f:
         for line in paths:
             f.write(f'{line}\n')
 
@@ -101,6 +96,7 @@ def findCoins(coin_imgs):
                 # Busca una moneda en la imaegn
                 findCoin(pth)
         except cv2.error:  # Tratamos cuando no encuentra el archivo
+            traceback.print_exc()
             print("Archivo no encontrado")
 
 
@@ -110,7 +106,7 @@ def findCoin(img, ncoins=1):
 
     # -- DEBUG --
     # Imprime los datos por pantalla
-    print(data)
+    # print(data)
 
     # -- POR COMPLETAR --
     # Añadir identificacion por aprendizaje
@@ -120,26 +116,16 @@ def addCoins(args):
     # Si no se especifica ninguna dirección, identifica la anteriormente seleccionada
     if args == []:
         print("Añade información de la moneda:\n" +
-              "add PATH_1 PATH_2 ... PATH_N {Info}\n" +
+              "add PATH_1 PATH_2 ... PATH_N\n" +
               "Se pueden seleccionar carpetas")
         return
 
     try:
         # Separa imagenes de atributos
-        if len(args) == 1:
+        if len(args) == 0:
             imgs = readPaths()
-            info = args[0]
         else:
-            imgs = args[0:-1]
-            info = args[-1]
-
-        # Obtenemos los atributos
-        info = info[1:-1].split(",")
-        info_dict = {}
-        # Los metemos en un diccionario
-        for atb in info:
-            key_value = atb.split(":")
-            info_dict.update({key_value[0]: key_value[1]})
+            imgs = args
 
         # Extraemos datos de todas la imagenes especificadas
         data = None
@@ -173,19 +159,32 @@ def addCoins(args):
         # -- POR COMPLETAR --
 
     except cv2.error:  # Tratamos cuando no encuentra el archivo
+        traceback.print_exc()
         print("Archivo no encontrado")
     except ValueError:  # Error en el formato del nombre del archivo
-        print("Error: Seguir formato -> PATH_1,PATH_2,...PATH_N{Info}")
+        print("Error: Seguir formato -> add PATH_1,PATH_2,...PATH_N")
 
 
 def writeCSV(data):
     # Introduce los datos en file_csv
-    with open(file_csv, mode='w') as f:
+    with open(dp.FILE_CSV, mode='w') as f:
         writer = csv.writer(f)
         # Atributos
         writer.writerow(data.keys())
         # Valores
         writer.writerows(zip(*data.values()))
+
+
+def setInfo(args):
+    if len(args) < 2:
+        print("Error: Seguir formato -> set-info CLASS {dict Info}")
+        return
+
+    classId = args[0]
+    info = args[1]
+
+    with open(dp.FILE_COIN_INFO, 'a') as f:
+        f.write(f"{classId}:{info}")
 
 
 def invalidCommand(_):
@@ -204,7 +203,8 @@ def processCommand():
     select_action = {
         "img": setImg,
         "find": findCoins,
-        "add": addCoins
+        "add": addCoins,
+        "set-info": setInfo
     }
     # Accionador del metodo asignado al comando ejecutado
     select_action.get(command[0], invalidCommand)(command[1:])
