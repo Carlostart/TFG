@@ -20,10 +20,10 @@ HCIRCLES_PAR1 = 50
 HCIRCLES_PAR2 = 100
 HCIRCLES_MINRAD = 127
 
-HLINES_GAUSS_KERNEL = (21, 21)
+HLINES_GAUSS_KERNEL = (9, 9)
 HLINES_GAUSS_SIGMA = 5
 
-OCR_MINRATE = 0.7
+OCR_MINRATE = 0.5
 
 N_HUMOMS = 2
 
@@ -31,13 +31,17 @@ KP_MAXCORNERS = 10
 KP_QUALITY = 0.1
 KP_MINDIST = 5
 
+NUM_LINES = 50
+
 with open(FILE_COIN_WORDS, 'r') as f:
     COIN_WORDS = set(f.readlines())
 
 
 def initData():
     data = {"HU_1": [],
-            "HU_2": []
+            "HU_2": [],
+            "CG_X": [],
+            "CG_Y": []
             }
     for word in COIN_WORDS:
         data.update({f"OCR_{word[:-1]}": []})
