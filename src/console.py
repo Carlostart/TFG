@@ -1,10 +1,12 @@
-import traceback
 from imProcessing import ImProcessing
+import dataProcessing as dp
+
+import traceback
 import sys
 import os
+
 import csv
 import cv2
-import dataProcessing as dp
 
 
 def readPaths():
@@ -30,7 +32,7 @@ def readPaths():
         return []
 
 
-def writePaths(paths, mode='w'):
+def writePaths(paths: list[str], mode='w'):
     # Escribe en el fichero todos los paths de archivos o carpetas
     with open(dp.FILE_PATHS, mode) as f:
         for line in paths:
@@ -184,7 +186,7 @@ def setInfo(args):
     info = args[1]
 
     with open(dp.FILE_COIN_INFO, 'a') as f:
-        f.write(f"{classId}:{info}")
+        f.write(f"{classId}:{info}\n")
 
 
 def invalidCommand(_):
