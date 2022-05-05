@@ -1,6 +1,7 @@
-import scipy.ndimage as ndi
-from ast import Try
+from cv2 import line
 import dataProcessing as dp
+
+import scipy.ndimage as ndi
 import math
 
 import matplotlib.pyplot as plt
@@ -8,7 +9,7 @@ import numpy as np
 import cv2
 import easyocr
 
-DEBUG = True
+DEBUG = False
 
 
 class ImProcessing:
@@ -35,11 +36,7 @@ class ImProcessing:
 
         # Obtenemos el nombre del archivo
         img_file = img_path.split('\\')[-1]
-        # Si hay multiples monedas en la imagen debe estar indicado con M
-        if img_file[0] == 'M':
-            id = int(img_file.split('_')[1])
-        else:
-            id = int(img_file.split('_')[0])
+        class_id = dp.getClass(img_file)
 
         # Si hay varias monedas en una misma imagen procesamos todas
         for image in images:
@@ -52,15 +49,19 @@ class ImProcessing:
             edges = self.edgesInside(image)
             # Calculamos centro de gravedad y orientamos imgaen
             rotated, cog = self.normalizeOrientation(edges, edges)
-            self.getLines(rotated)
+            lines = self.getLines(rotated)
+            lines_data = dp.getLinesData(lines, rotated.shape[0])
 
             # Guardamos los datos obtenidos en el diccionario
             data.get("HU_1").append(Hu[0])
             data.get("HU_2").append(Hu[1])
             data.get("CG_X").append(cog[0])
             data.get("CG_Y").append(cog[1])
+            for k in lines_data:
+                data.get(k).append(lines_data[k])
+
             dp.appendOcrData(ocr_data, data)
-            data.get("CLASS").append(id)
+            data.get("CLASS").append(class_id)
 
             if DEBUG:
                 plt.subplot(241)
@@ -246,25 +247,43 @@ class ImProcessing:
 
     @ classmethod
     def getLines(self, edges: cv2.Mat):
-        lines = cv2.HoughLines(edges, 1, np.pi/180, 50)
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+        morphed = cv2.morphologyEx(
+            edges, cv2.MORPH_CROSS, kernel, iterations=1)
+
+        morphed = self.removeExternalRing(edges, .75)
+
+        lines = cv2.HoughLinesP(morphed, 1, np.pi/360, 50)
+        lines = np.concatenate(lines)
         if lines is not None:
-            edges = cv2.cvtColor(edges, cv2.COLOR_GRAY2BGR)
+            morphed = cv2.cvtColor(morphed, cv2.COLOR_GRAY2BGR)
 
             m = min(len(lines), dp.NUM_LINES)
-            for line in lines[:m]:
-                r, theta = line[0]
-                a, b = np.cos(theta), np.sin(theta)
-                x0, y0 = a*r, b*r
-                x1, y1, x2, y2 = int(
-                    x0 + 1000*(-b)), int(y0 + 1000*(a)), int(x0 - 1000*(-b)), int(y0 - 1000*(a))
-                cv2.line(edges, (x1, y1), (x2, y2), (0, 0, 255), 2)
-
             if DEBUG:
-                plt.subplot(248)
-                plt.imshow(edges)
-                plt.title('Lines')
+                # for line in lines[:m]:
+                #     r, theta = line[0]
+                #     a, b = np.cos(theta), np.sin(theta)
+                #     x0, y0 = a*r, b*r
+                #     x1, y1, x2, y2 = int(
+                #         x0 + 1000*(-b)), int(y0 + 1000*(a)), int(x0 - 1000*(-b)), int(y0 - 1000*(a))
+                #     cv2.line(morphed, (x1, y1), (x2, y2), (0, 0, 255), 2)
+                #     cv2.circle(morphed, (int(x0), int(y0)),
+                #                3, (0, 255, 0), cv2.FILLED)
+                sorted_lines = sorted(lines, key=lambda x: (
+                    (x[0]-x[2])**2 + (x[1]-x[3])**2)**.5, reverse=True)
 
-            return lines[:m]
+                for line in lines[:m]:
+                    cv2.line(morphed, tuple(line[:2]), tuple(
+                        line[2:4]), (0, 255, 0), 2)
+
+                for line in sorted_lines[:1]:
+                    cv2.line(morphed, tuple(line[:2]), tuple(
+                        line[2:4]), (255, 0, 0), 2)
+
+                plt.subplot(248)
+                plt.imshow(morphed)
+                plt.title('Lines')
+            return lines
         else:
             return []
 
@@ -287,6 +306,8 @@ class ImProcessing:
                        3, (255, 0, 0), cv2.FILLED)
             cv2.circle(edges, (int(cmx), int(cmy)),
                        5, (0, 255, 0), cv2.FILLED)
+            cv2.line(edges, (int(cx), int(cy)),
+                     (int(cmx), int(cmy)), (0, 0, 255), 2)
             plt.imshow(edges)
             plt.title('Centers')
 

@@ -114,21 +114,19 @@ def findCoin(img, ncoins=1):
     # Añadir identificacion por aprendizaje
 
 
-def addCoins(args):
+def addCoins(coin_imgs):
     # Si no se especifica ninguna dirección, identifica la anteriormente seleccionada
-    if args == []:
-        print("Añade información de la moneda:\n" +
-              "add PATH_1 PATH_2 ... PATH_N\n" +
-              "Se pueden seleccionar carpetas")
-        return
-
+    if coin_imgs == []:
+        imgs = readPaths()
+        # Si faltan argumentos los pedimos
+        if imgs == []:
+            print("Añade información de la moneda:\n" +
+                  "add PATH_1 PATH_2 ... PATH_N\n" +
+                  "Se pueden seleccionar carpetas")
+            return
+    else:
+        imgs = coin_imgs
     try:
-        # Separa imagenes de atributos
-        if len(args) == 0:
-            imgs = readPaths()
-        else:
-            imgs = args
-
         # Extraemos datos de todas la imagenes especificadas
         data = None
         for i, pth in enumerate(imgs):
@@ -150,7 +148,7 @@ def addCoins(args):
             else:
                 d = ImProcessing.extractData(pth)
 
-            if i == 0:
+            if data == None and d != None:
                 data = d
             else:
                 for k in d:
@@ -174,6 +172,7 @@ def writeCSV(data):
         # Atributos
         writer.writerow(data.keys())
         # Valores
+        r = [len(v) for v in data.values()]
         writer.writerows(zip(*data.values()))
 
 
