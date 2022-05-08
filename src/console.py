@@ -80,7 +80,7 @@ def findCoins(coin_imgs):
         try:
             # Si acaba es direcctorio
             if os.path.isdir(pth):
-                coin_imgs.remove(pth)
+                # coin_imgs.remove(pth)
                 # Introducimos todos los ficheros de la carpeta junto con su path a la lists
                 coin_imgs += [os.path.join(pth, file)
                               for file in os.listdir(pth)]
@@ -88,15 +88,13 @@ def findCoins(coin_imgs):
 
             # Obtenemos el nombre del archivo
             img = pth.split('\\')[-1]
+            img = img.split('/')[-1]
             # Si se espacifica que hayan multiples monedas en la imagen
-            if img[0] == 'M':
-                # Leemos el numero de monedas especificados
-                nc = int(img.split('_')[0][1:])
-                # Busca nc monedas en la imagen
-                findCoin(pth, nc)
-            else:
-                # Busca una moneda en la imaegn
-                findCoin(pth)
+            print(img)
+            _, nc = dp.getClass(img)
+            # Busca una moneda en la imaegn
+            print(nc)
+            findCoin(pth, nc)
         except cv2.error:  # Tratamos cuando no encuentra el archivo
             traceback.print_exc()
             print("Archivo no encontrado")
@@ -129,7 +127,7 @@ def addCoins(coin_imgs):
     try:
         # Extraemos datos de todas la imagenes especificadas
         data = None
-        for i, pth in enumerate(imgs):
+        for pth in imgs:
             if os.path.isdir(pth):
                 imgs.remove(pth)
                 # Introducimos todos los ficheros de la carpeta junto con su path a la lists
@@ -139,14 +137,11 @@ def addCoins(coin_imgs):
 
             # Obtenemos el nombre del archivo
             img = pth.split('\\')[-1]
+            img = img.split('/')[-1]
             # Si hay multiples monedas en la imagen debe estar indicado con M
-            if img[0] == 'M':
-                # Leemos la ID y el numero de monedas especificados
-                nc = int(img.split('_')[0][1:])
-                # Introducimos los datos obtenidos a la lista
-                d = ImProcessing.extractData(pth, nc)
-            else:
-                d = ImProcessing.extractData(pth)
+            _, nc = dp.getClass(img)
+
+            d = ImProcessing.extractData(pth, nc)
 
             if data == None and d != None:
                 data = d
@@ -188,6 +183,47 @@ def setInfo(args):
         f.write(f"{classId}:{info}\n")
 
 
+def testData(coin_imgs):
+    if coin_imgs == []:
+        imgs = readPaths()
+        # Si faltan argumentos los pedimos
+        if imgs == []:
+            print("Comprueba el funcionamiento del algoritmo de estracción de datos:\n" +
+                  "test-data PATH_1 PATH_2 ... PATH_N\n" +
+                  "Se pueden seleccionar carpetas")
+            return
+    else:
+        imgs = coin_imgs
+
+    for pth in imgs:
+        if os.path.isdir(pth):
+            imgs.remove(pth)
+            # Introducimos todos los ficheros de la carpeta junto con su path a la lists
+            imgs += [os.path.join(pth, file)
+                     for file in os.listdir(pth)]
+            continue
+
+        # Obtenemos el nombre del archivo
+        img = pth.split('\\')[-1]
+        # Si hay multiples monedas en la imagen debe estar indicado con M
+        _, nc = dp.getClass(img)
+
+        image = cv2.imread(pth)
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)  # Grayscale
+        image = cv2.normalize(image, None, alpha=0, beta=255,
+                              norm_type=cv2.NORM_MINMAX)
+        cropped = ImProcessing.cropCircle(image, nc)
+
+        img = img.split('.')
+        for i, cr in enumerate(cropped):
+            # print(f'OUT -> {dp.OUT_FOLDER}/CROPPED_{img[0]}_{i}.{img[1]}')
+            cv2.imwrite(
+                f'{dp.OUT_FOLDER}/CROPPED_{img[0]}_{i}.{img[1]}', cv2.resize(cr, (255, 255)))
+            # edges = ImProcessing.edgesInside(cr)
+            # cv2.imwrite(
+            #     f'{dp.OUT_FOLDER}/EDGES_{img[0]}_{i}.{img[1]}', cv2.resize(edges, (255, 255)))
+
+
 def invalidCommand(_):
     print("Comando no existe")
 
@@ -205,7 +241,8 @@ def processCommand():
         "img": setImg,
         "find": findCoins,
         "add": addCoins,
-        "set-info": setInfo
+        "set-info": setInfo,
+        "test-data": testData
     }
     # Accionador del metodo asignado al comando ejecutado
     select_action.get(command[0], invalidCommand)(command[1:])

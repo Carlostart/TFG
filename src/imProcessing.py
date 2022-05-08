@@ -9,7 +9,7 @@ import numpy as np
 import cv2
 import easyocr
 
-DEBUG = False
+DEBUG = True
 
 
 class ImProcessing:
@@ -25,6 +25,7 @@ class ImProcessing:
         print(f"Identificando imagen: {img_path}")
         img = cv2.imread(img_path)  # Lee imagen
         # -- Ajustes de imagen para que sigan un mismo formato --
+
         img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)  # Grayscale
         img = cv2.normalize(img, None, alpha=0, beta=255,
                             norm_type=cv2.NORM_MINMAX)
@@ -36,7 +37,7 @@ class ImProcessing:
 
         # Obtenemos el nombre del archivo
         img_file = img_path.split('\\')[-1]
-        class_id = dp.getClass(img_file)
+        class_id, _ = dp.getClass(img_file)
 
         # Si hay varias monedas en una misma imagen procesamos todas
         for image in images:
@@ -44,9 +45,12 @@ class ImProcessing:
             ocr_data = self.getOCR(equalized)   # Lectura de caracteres
             # Ajustamos el tamaño
             resized = cv2.resize(image, (dp.IM_SIZE_ADJ, dp.IM_SIZE_ADJ))
+            resized = self.removeExternalRing(resized, .9)
             Hu = self.huMoments(resized)      # Obtenemos los momentos de Hu
             # keyP = self.keyPoints(resized)    # Obtenemos las esquinas
             edges = self.edgesInside(image)
+            edges = self.removeExternalRing(edges, .7)
+
             # Calculamos centro de gravedad y orientamos imgaen
             rotated, cog = self.normalizeOrientation(edges, edges)
             lines = self.getLines(rotated)
@@ -85,7 +89,7 @@ class ImProcessing:
         return data
 
     def removeExternalRing(img: cv2.Mat, pr) -> cv2.Mat:
-        height, width = img.shape
+        height, width = img.shape[:2]
         # Ahora eliminamos el anillo exterior de la moneda
         mask = np.zeros((height, width), np.uint8)
         cv2.circle(mask, (int(height/2), int(width/2)), int((height/2) * pr), 255,
@@ -109,46 +113,62 @@ class ImProcessing:
 
     @ classmethod
     def cropCircle(self, img: cv2.Mat,  ncoins=1) -> list[cv2.Mat]:
-        height, width = img.shape
+        height, width = img.shape[:2]
+        imsize = (height + width)/2
         # Aplicamos un suavizado para eliminar ruidos
+        ksize = int(imsize/dp.HCIRCLES_KERNEL_RATIO)
+        print(f'ksize {ksize}')
+        ksize = ksize if ksize % 2 else ksize-1
+        sigma = (ksize-1)/6
         blurred = cv2.GaussianBlur(
-            img, dp.HCIRCLES_GAUSS_KERNEL, dp.HCIRCLES_GAUSS_SIGMA)
+            img, (ksize, ksize), sigma)
+
+        # plt.imshow(blurred, 'gray')
+        # plt.show()
         # Obtenemos los bordes de la imagen
         # (Multiplicamos la imagen por dos para aumentar las diferencias de intensidades)
         edges = cv2.Canny(blurred*2, dp.CANNY_TRHES1,
                           dp.CANNY_TRHES2)
 
+        kernel = cv2.getStructuringElement(
+            cv2.MORPH_ELLIPSE, (ksize, ksize))
+        morphed = cv2.morphologyEx(
+            edges, cv2.MORPH_DILATE, kernel, iterations=1)
+        # kernel = cv2.getStructuringElement(
+        #     cv2.MORPH_ELLIPSE, (int(ksize/2), int(ksize/2)))
+        # morphed = cv2.morphologyEx(
+        #     morphed, cv2.MORPH_OPEN, kernel, iterations=1)
         # -- {DEBUG} --
         if DEBUG:
-            self.DCanny = edges
+            self.DCanny = morphed
         # -------------
         #   Obtenemos los circulos
-        circles = cv2.HoughCircles(edges, cv2.HOUGH_GRADIENT, dp.HCIRCLES_DP, minDist=dp.IM_SIZE_ADJ,
-                                   param1=dp.HCIRCLES_PAR1, param2=dp.HCIRCLES_PAR2, minRadius=dp.HCIRCLES_MINRAD, maxRadius=0)
+        cdp = int(height/255)
+        circles = cv2.HoughCircles(morphed, cv2.HOUGH_GRADIENT, cdp, minDist=dp.IM_SIZE_ADJ,
+                                   param1=dp.HCIRCLES_PAR1, param2=dp.HCIRCLES_PAR2, minRadius=dp.HCIRCLES_MINRAD, maxRadius=2000)
 
         # Muestra cuantos circulos se han encontrado
         print(f"Detectados {len(circles[0,:])} Circulos")
         # Obtenemos la mediana de los radios
-        mediana = np.median(circles[0, :ncoins, 2])
 
-        print(f"Mediana: {mediana}" if ncoins > 1 else '')
+        rcoin = circles[0, 0, 2]
+        print(f'Coin Size -> {rcoin}')
 
         cropped_ls = []
         # Pasamos a escala BGR para pocer marcar la imagen con colores
         show = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
         # Por cada circulo:
-        miss = False
         deleted = 0
         for idx, i in enumerate(circles[0, :]):
+            miss = False
             # -- Creamos una máscara --
             mask = np.zeros((height, width), np.uint8)
             x, y, r = map(int, i)  # Clasificamos centro y radio
             # Si el circulo se sale de la imagen reducimos el radio
-            r = int(r*0.9)
             r = min(x, y, width-x, height-y, r)
 
             # Borra circulos de tamaño desproporcionado
-            if (r > mediana*1.2 or r < mediana*0.8):
+            if (r > rcoin*1.2 or r < rcoin*0.8):
                 print(f'Borra circulo: x={x} y={y} r={r}')
                 miss = True
                 deleted += 1
@@ -166,14 +186,17 @@ class ImProcessing:
 
             # -- DEBUG} --
             #  Dibujamos los circulos seleccionados
-            cv2.circle(show,  (x, y), r, (0, 255, 0),
-                       thickness=2)
+            cv2.circle(show,  (x, y), r, (255, 0, 0),
+                       thickness=10)
+
             if DEBUG:
                 self.DCircles = show
             #  ------------
             # Nos salimos del bucle cuando hemos seleccionado el numero de monedas especificado
-            if idx == ncoins - 1 and (deleted > 3 or not miss):
+            if idx >= ncoins - 1 and (deleted > 3 or not miss):
                 break
+        # plt.imshow(show)
+        # plt.show()
         return cropped_ls
 
     @ staticmethod
@@ -236,11 +259,18 @@ class ImProcessing:
 
     @ classmethod
     def edgesInside(self, img):
+        h, w = img.shape
         # Normalizamos
         img = self.clahe(cv2.cvtColor(img, cv2.COLOR_GRAY2BGR))
         # Aplicamos un suavizado para eliminar ruidos
+        ksize = int(h/dp.HLINES_KERNEL_RATIO)
+        ksize = ksize if ksize % 2 else ksize-1
+        sigma = (ksize-1)/6
         aux = cv2.GaussianBlur(
-            img, dp.HLINES_GAUSS_KERNEL, dp.HLINES_GAUSS_SIGMA)
+            img, (ksize, ksize), sigma)
+
+        # plt.imshow(aux, 'gray')
+        # plt.show()
         # Obtenemos los bordes de la imagen
         # (Multiplicamos la imagen por dos para aumentar las diferencias de intensidades)
         return cv2.Canny(aux, dp.CANNY_TRHES1, dp.CANNY_TRHES2)
@@ -250,8 +280,6 @@ class ImProcessing:
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
         morphed = cv2.morphologyEx(
             edges, cv2.MORPH_CROSS, kernel, iterations=1)
-
-        morphed = self.removeExternalRing(edges, .75)
 
         lines = cv2.HoughLinesP(morphed, 1, np.pi/360, 50)
         lines = np.concatenate(lines)
@@ -294,10 +322,14 @@ class ImProcessing:
 
         cmy, cmx = ndi.center_of_mass(edges)
 
-        angle = math.degrees(math.atan2(cy-cmy, cx-cmx))
+        dist = np.sqrt((cx-cmx)**2 + (cy-cmy)**2)*dp.IM_SIZE_ADJ/h
+        if(dist > dp.MIN_CENTERS_DIST):
+            angle = math.degrees(math.atan2(cy-cmy, cx-cmx))
 
-        M = cv2.getRotationMatrix2D((cx, cy), angle+180, 1)
-        rotated = cv2.warpAffine(image, M, (w, h))
+            M = cv2.getRotationMatrix2D((cx, cy), angle+180, 1)
+            rotated = cv2.warpAffine(image, M, (w, h))
+        else:
+            rotated = image
 
         if DEBUG:
             edges = cv2.cvtColor(edges, cv2.COLOR_GRAY2BGR)

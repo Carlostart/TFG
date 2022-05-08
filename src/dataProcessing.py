@@ -1,4 +1,3 @@
-from ast import Num
 import math
 from pathlib import Path
 from difflib import SequenceMatcher as SM
@@ -10,25 +9,22 @@ FILE_PATHS = PROJECT_ROOT / 'data' / "path_to_data.txt"
 FILE_CSV = PROJECT_ROOT / 'data' / "DataSet.csv"
 FILE_COIN_INFO = PROJECT_ROOT / 'data' / "coin_info.txt"
 FILE_COIN_WORDS = PROJECT_ROOT / 'data' / "coin_words.txt"
-
-print(FILE_CSV)
+OUT_FOLDER = 'C:/Users/Carlo/OneDrive/Escritorio/out'
 
 IM_SIZE_ADJ = 255
 
 CANNY_TRHES1 = 50
 CANNY_TRHES2 = 100
 
-HCIRCLES_GAUSS_KERNEL = (15, 15)
-HCIRCLES_GAUSS_SIGMA = 10
+HCIRCLES_KERNEL_RATIO = 100
 HCIRCLES_DP = 4
 HCIRCLES_PAR1 = 50
 HCIRCLES_PAR2 = 100
 HCIRCLES_MINRAD = 127
 
-HLINES_GAUSS_KERNEL = (9, 9)
-HLINES_GAUSS_SIGMA = 5
+HLINES_KERNEL_RATIO = 47
 
-OCR_MINRATE = 0.5
+OCR_MINRATE = 0.75
 
 N_HUMOMS = 2
 
@@ -37,6 +33,8 @@ KP_QUALITY = 0.1
 KP_MINDIST = 5
 
 NUM_LINES = 20
+
+MIN_CENTERS_DIST = 7
 
 with open(FILE_COIN_WORDS, 'r') as f:
     COIN_WORDS = set(f.readlines())
@@ -130,9 +128,11 @@ def getLinesData(lines: list, img_size: int):
 
 
 def getClass(file_name):
-    # Si hay multiples monedas en la imagen debe estar indicado con M
-    if file_name[0] == 'M':
-        class_id = int(file_name.split('_')[1])
-    else:
-        class_id = int(file_name.split('_')[0])
-    return class_id
+    # Si hay multiples monedas en la imagen debe estar indicado entre corchetes
+    class_id = file_name.split('_')[0]
+    ncoins = 1
+    if file_name[0] == '[':
+        aux = class_id.split(']')
+        ncoins = int(aux[0][1:])
+        class_id = aux[1]
+    return class_id, ncoins
