@@ -22,7 +22,7 @@ HCIRCLES_PAR1 = 50
 HCIRCLES_PAR2 = 100
 HCIRCLES_MINRAD = 127
 
-HLINES_KERNEL_RATIO = 47
+HLINES_KERNEL_RATIO = 60
 
 OCR_MINRATE = 0.75
 
@@ -34,7 +34,7 @@ KP_MINDIST = 5
 
 NUM_LINES = 20
 
-MIN_CENTERS_DIST = 7
+MIN_CENTERS_DIST = 10
 
 with open(FILE_COIN_WORDS, 'r') as f:
     COIN_WORDS = set(f.readlines())
@@ -129,7 +129,7 @@ def getLinesData(lines: list, img_size: int):
 
 def getClass(file_name):
     # Si hay multiples monedas en la imagen debe estar indicado entre corchetes
-    class_id = file_name.split('_')[0]
+    class_id = file_name.split(' ')[0]
     ncoins = 1
     if file_name[0] == '[':
         aux = class_id.split(']')

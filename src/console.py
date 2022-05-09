@@ -90,10 +90,8 @@ def findCoins(coin_imgs):
             img = pth.split('\\')[-1]
             img = img.split('/')[-1]
             # Si se espacifica que hayan multiples monedas en la imagen
-            print(img)
             _, nc = dp.getClass(img)
             # Busca una moneda en la imaegn
-            print(nc)
             findCoin(pth, nc)
         except cv2.error:  # Tratamos cuando no encuentra el archivo
             traceback.print_exc()

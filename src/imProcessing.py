@@ -42,14 +42,14 @@ class ImProcessing:
         # Si hay varias monedas en una misma imagen procesamos todas
         for image in images:
             equalized = self.clahe(cv2.cvtColor(image, cv2.COLOR_GRAY2BGR))
-            ocr_data = self.getOCR(equalized)   # Lectura de caracteres
+            # ocr_data = self.getOCR(equalized)   # Lectura de caracteres
             # Ajustamos el tamaño
             resized = cv2.resize(image, (dp.IM_SIZE_ADJ, dp.IM_SIZE_ADJ))
             resized = self.removeExternalRing(resized, .9)
             Hu = self.huMoments(resized)      # Obtenemos los momentos de Hu
             # keyP = self.keyPoints(resized)    # Obtenemos las esquinas
             edges = self.edgesInside(image)
-            edges = self.removeExternalRing(edges, .7)
+            edges = self.removeExternalRing(edges, .65)
 
             # Calculamos centro de gravedad y orientamos imgaen
             rotated, cog = self.normalizeOrientation(edges, edges)
@@ -64,7 +64,7 @@ class ImProcessing:
             for k in lines_data:
                 data.get(k).append(lines_data[k])
 
-            dp.appendOcrData(ocr_data, data)
+            # dp.appendOcrData(ocr_data, data)
             data.get("CLASS").append(class_id)
 
             if DEBUG:
@@ -117,7 +117,7 @@ class ImProcessing:
         imsize = (height + width)/2
         # Aplicamos un suavizado para eliminar ruidos
         ksize = int(imsize/dp.HCIRCLES_KERNEL_RATIO)
-        print(f'ksize {ksize}')
+        # print(f'ksize {ksize}')
         ksize = ksize if ksize % 2 else ksize-1
         sigma = (ksize-1)/6
         blurred = cv2.GaussianBlur(
@@ -261,19 +261,40 @@ class ImProcessing:
     def edgesInside(self, img):
         h, w = img.shape
         # Normalizamos
-        img = self.clahe(cv2.cvtColor(img, cv2.COLOR_GRAY2BGR))
-        # Aplicamos un suavizado para eliminar ruidos
-        ksize = int(h/dp.HLINES_KERNEL_RATIO)
-        ksize = ksize if ksize % 2 else ksize-1
-        sigma = (ksize-1)/6
-        aux = cv2.GaussianBlur(
-            img, (ksize, ksize), sigma)
+        # img = self.clahe(cv2.cvtColor(img, cv2.COLOR_GRAY2BGR))
 
+        # plt.subplot(221)
+        # plt.title('ORIGINAL')
+        # plt.imshow(img, 'gray')
+
+        aux = img
+        for i in range(1):
+            # Aplicamos un suavizado para eliminar ruidos
+            ksize = int(h/dp.HLINES_KERNEL_RATIO)
+            fm = cv2.Laplacian(img, cv2.CV_64F).var()
+            print(f'fm {fm}')
+            if fm < 600:
+                ksize = int(ksize*.7)
+            ksize = ksize if ksize % 2 else ksize-1
+            sigma = (ksize-1)/6
+
+            aux = cv2.GaussianBlur(
+                aux, (ksize, ksize), sigma)
+
+        aux = self.clahe(cv2.cvtColor(aux, cv2.COLOR_GRAY2BGR))
+        # plt.subplot(223)
+        # plt.title('GAUSS')
+        # plt.imshow(aux, 'gray')
         # plt.imshow(aux, 'gray')
         # plt.show()
         # Obtenemos los bordes de la imagen
         # (Multiplicamos la imagen por dos para aumentar las diferencias de intensidades)
-        return cv2.Canny(aux, dp.CANNY_TRHES1, dp.CANNY_TRHES2)
+        edges = cv2.Canny(aux, dp.CANNY_TRHES1, dp.CANNY_TRHES2)
+        # plt.subplot(224)
+        # plt.title('EDGES')
+        # plt.imshow(edges, 'gray')
+        # plt.show()
+        return edges
 
     @ classmethod
     def getLines(self, edges: cv2.Mat):
@@ -323,6 +344,7 @@ class ImProcessing:
         cmy, cmx = ndi.center_of_mass(edges)
 
         dist = np.sqrt((cx-cmx)**2 + (cy-cmy)**2)*dp.IM_SIZE_ADJ/h
+        print(f'Center Dist -> {dist}')
         if(dist > dp.MIN_CENTERS_DIST):
             angle = math.degrees(math.atan2(cy-cmy, cx-cmx))
 
