@@ -9,7 +9,7 @@ import numpy as np
 import cv2
 import easyocr
 
-DEBUG = True
+DEBUG = False
 
 
 class ImProcessing:
@@ -25,24 +25,25 @@ class ImProcessing:
         print(f"Identificando imagen: {img_path}")
         img = cv2.imread(img_path)  # Lee imagen
         # -- Ajustes de imagen para que sigan un mismo formato --
-
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)  # Grayscale
-        img = cv2.normalize(img, None, alpha=0, beta=255,
-                            norm_type=cv2.NORM_MINMAX)
-        # Separa y recorta cada moneda
-        images = self.cropCircle(img, ncoins)
+        if ncoins > 0:
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)  # Grayscale
+            img = cv2.normalize(img, None, alpha=0, beta=255,
+                                norm_type=cv2.NORM_MINMAX)
+            # Separa y recorta cada moneda
+            images = self.cropCircle(img, ncoins)
+        else:
+            images = [cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)]
 
         # Diccionario de listas de datos para exportar al archivo csv
         data = dp.initData()
 
         # Obtenemos el nombre del archivo
-        img_file = img_path.split('\\')[-1]
-        class_id, _ = dp.getClass(img_file)
+        class_id, _ = dp.getClass(img_path)
 
         # Si hay varias monedas en una misma imagen procesamos todas
         for image in images:
             equalized = self.clahe(cv2.cvtColor(image, cv2.COLOR_GRAY2BGR))
-            # ocr_data = self.getOCR(equalized)   # Lectura de caracteres
+            ocr_data = self.getOCR(equalized)   # Lectura de caracteres
             # Ajustamos el tamaño
             resized = cv2.resize(image, (dp.IM_SIZE_ADJ, dp.IM_SIZE_ADJ))
             resized = self.removeExternalRing(resized, .9)
@@ -61,10 +62,12 @@ class ImProcessing:
             data.get("HU_2").append(Hu[1])
             data.get("CG_X").append(cog[0])
             data.get("CG_Y").append(cog[1])
+            data.get("CENTERS_DIST").append(cog[2])
+            data.get("CENTERS_ANGLE").append(cog[3])
             for k in lines_data:
                 data.get(k).append(lines_data[k])
 
-            # dp.appendOcrData(ocr_data, data)
+            dp.appendOcrData(ocr_data, data)
             data.get("CLASS").append(class_id)
 
             if DEBUG:
@@ -272,7 +275,7 @@ class ImProcessing:
             # Aplicamos un suavizado para eliminar ruidos
             ksize = int(h/dp.HLINES_KERNEL_RATIO)
             fm = cv2.Laplacian(img, cv2.CV_64F).var()
-            print(f'fm {fm}')
+            # print(f'fm {fm}')
             if fm < 600:
                 ksize = int(ksize*.7)
             ksize = ksize if ksize % 2 else ksize-1
@@ -345,9 +348,8 @@ class ImProcessing:
 
         dist = np.sqrt((cx-cmx)**2 + (cy-cmy)**2)*dp.IM_SIZE_ADJ/h
         print(f'Center Dist -> {dist}')
+        angle = math.degrees(math.atan2(cy-cmy, cx-cmx))
         if(dist > dp.MIN_CENTERS_DIST):
-            angle = math.degrees(math.atan2(cy-cmy, cx-cmx))
-
             M = cv2.getRotationMatrix2D((cx, cy), angle+180, 1)
             rotated = cv2.warpAffine(image, M, (w, h))
         else:
@@ -369,4 +371,4 @@ class ImProcessing:
             plt.imshow(rotated, 'gray')
             plt.title("Rotated")
 
-        return rotated, (cmx, cmy)
+        return rotated, (cmx, cmy, dist, angle)

@@ -86,11 +86,8 @@ def findCoins(coin_imgs):
                               for file in os.listdir(pth)]
                 continue
 
-            # Obtenemos el nombre del archivo
-            img = pth.split('\\')[-1]
-            img = img.split('/')[-1]
             # Si se espacifica que hayan multiples monedas en la imagen
-            _, nc = dp.getClass(img)
+            _, nc = dp.getClass(pth)
             # Busca una moneda en la imaegn
             findCoin(pth, nc)
         except cv2.error:  # Tratamos cuando no encuentra el archivo
@@ -133,11 +130,7 @@ def addCoins(coin_imgs):
                          for file in os.listdir(pth)]
                 continue
 
-            # Obtenemos el nombre del archivo
-            img = pth.split('\\')[-1]
-            img = img.split('/')[-1]
-            # Si hay multiples monedas en la imagen debe estar indicado con M
-            _, nc = dp.getClass(img)
+            _, nc = dp.getClass(pth)
 
             d = ImProcessing.extractData(pth, nc)
 
@@ -201,10 +194,8 @@ def testData(coin_imgs):
                      for file in os.listdir(pth)]
             continue
 
-        # Obtenemos el nombre del archivo
-        img = pth.split('\\')[-1]
         # Si hay multiples monedas en la imagen debe estar indicado con M
-        _, nc = dp.getClass(img)
+        _, nc = dp.getClass(pth)
 
         image = cv2.imread(pth)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)  # Grayscale
@@ -212,11 +203,13 @@ def testData(coin_imgs):
                               norm_type=cv2.NORM_MINMAX)
         cropped = ImProcessing.cropCircle(image, nc)
 
+        pth = f'{pth[:-len(img)-1]}_CROPPED'
+        if not os.path.exists(pth):
+            os.makedirs(pth)
         img = img.split('.')
         for i, cr in enumerate(cropped):
-            # print(f'OUT -> {dp.OUT_FOLDER}/CROPPED_{img[0]}_{i}.{img[1]}')
-            cv2.imwrite(
-                f'{dp.OUT_FOLDER}/CROPPED_{img[0]}_{i}.{img[1]}', cv2.resize(cr, (255, 255)))
+            print(f'{pth}/{img[0]}_{i}.{img[1]}')
+            cv2.imwrite(f'{pth}/{img[0]}_{i}.{img[1]}', cr)
             # edges = ImProcessing.edgesInside(cr)
             # cv2.imwrite(
             #     f'{dp.OUT_FOLDER}/EDGES_{img[0]}_{i}.{img[1]}', cv2.resize(edges, (255, 255)))

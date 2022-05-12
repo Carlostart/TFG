@@ -9,7 +9,7 @@ FILE_PATHS = PROJECT_ROOT / 'data' / "path_to_data.txt"
 FILE_CSV = PROJECT_ROOT / 'data' / "DataSet.csv"
 FILE_COIN_INFO = PROJECT_ROOT / 'data' / "coin_info.txt"
 FILE_COIN_WORDS = PROJECT_ROOT / 'data' / "coin_words.txt"
-OUT_FOLDER = 'C:/Users/Carlo/OneDrive/Escritorio/out'
+OUT_FOLDER = PROJECT_ROOT / 'data'
 
 IM_SIZE_ADJ = 255
 
@@ -22,9 +22,9 @@ HCIRCLES_PAR1 = 50
 HCIRCLES_PAR2 = 100
 HCIRCLES_MINRAD = 127
 
-HLINES_KERNEL_RATIO = 60
+HLINES_KERNEL_RATIO = 50
 
-OCR_MINRATE = 0.75
+OCR_MINRATE = 0.6
 
 N_HUMOMS = 2
 
@@ -34,7 +34,7 @@ KP_MINDIST = 5
 
 NUM_LINES = 20
 
-MIN_CENTERS_DIST = 10
+MIN_CENTERS_DIST = 500
 
 with open(FILE_COIN_WORDS, 'r') as f:
     COIN_WORDS = set(f.readlines())
@@ -43,24 +43,30 @@ with open(FILE_COIN_WORDS, 'r') as f:
 def initData():
     data = {"HU_1": [],
             "HU_2": [],
+
             "CG_X": [],
             "CG_Y": [],
-            "BEST_AVG_LEN": [],
-            "BEST_AVG_ANGLE": [],
+            "CENTERS_DIST": [],
+            "CENTERS_ANGLE": [],
+
             "BEST_AVG_X": [],
             "BEST_AVG_Y": [],
+            "BEST_AVG_LEN": [],
+            "BEST_AVG_ANGLE": [],
             "BEST_VAR_LEN": [],
             "BEST_VAR_ANGLE": [],
-            "LONG_AVG_LEN": [],
-            "LONG_AVG_ANGLE": [],
+
             "LONG_AVG_X": [],
             "LONG_AVG_Y": [],
-            "LONG_VAR_ANGLE": [],
+            "LONG_AVG_LEN": [],
+            "LONG_AVG_ANGLE": [],
             "LONG_VAR_LEN": [],
-            "LONGEST_LEN": [],
-            "LONGEST_ANGLE": [],
+            "LONG_VAR_ANGLE": [],
+
             "LONGEST_X": [],
-            "LONGEST_Y": []
+            "LONGEST_Y": [],
+            "LONGEST_LEN": [],
+            "LONGEST_ANGLE": []
             }
     for word in COIN_WORDS:
         data.update({f"OCR_{word[:-1]}": []})
@@ -127,12 +133,16 @@ def getLinesData(lines: list, img_size: int):
     return lines_data
 
 
-def getClass(file_name):
-    # Si hay multiples monedas en la imagen debe estar indicado entre corchetes
-    class_id = file_name.split(' ')[0]
-    ncoins = 1
-    if file_name[0] == '[':
+def getClass(pth):
+    file = pth.split('\\')[-1]
+    file = file.split('/')[-1]
+    class_id = file.split(' ')[0]
+    if 'CROPPED' in pth:
+        ncoins = -1
+    elif file[0] == '[':
         aux = class_id.split(']')
         ncoins = int(aux[0][1:])
         class_id = aux[1]
+    else:
+        ncoins = 1
     return class_id, ncoins
