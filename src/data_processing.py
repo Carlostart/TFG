@@ -11,7 +11,7 @@ FILE_CSV = PROJECT_ROOT / "data" / "DataSet.csv"
 FILE_COIN_INFO = PROJECT_ROOT / "data" / "coin_info.txt"
 FILE_COIN_WORDS = PROJECT_ROOT / "data" / "coin_words.txt"
 OUT_FOLDER = PROJECT_ROOT / "data"
-RINGS_FOLDER = "data/RINGS"
+RINGS_FOLDER = "RINGS"
 
 IM_SIZE_ADJ = 255
 
