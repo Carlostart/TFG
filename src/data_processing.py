@@ -6,12 +6,12 @@ import numpy as np
 
 PROJECT_ROOT = Path(__file__).parents[1]
 
-FILE_PATHS = PROJECT_ROOT / "data" / "path_to_data.txt"
+FILE_PATHS = PROJECT_ROOT / "conf" / "path_to_data.txt"
 FILE_CSV = PROJECT_ROOT / "data" / "DataSet.csv"
-FILE_COIN_INFO = PROJECT_ROOT / "data" / "coin_info.txt"
-FILE_COIN_WORDS = PROJECT_ROOT / "data" / "coin_words.txt"
+FILE_COIN_INFO = PROJECT_ROOT / "conf" / "coin_info.txt"
+FILE_COIN_WORDS = PROJECT_ROOT / "conf" / "coin_words.txt"
 OUT_FOLDER = PROJECT_ROOT / "data"
-RINGS_FOLDER = "RINGS"
+RINGS_FOLDER = "conf/RINGS"
 
 IM_SIZE_ADJ = 255
 
