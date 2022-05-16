@@ -172,6 +172,7 @@ def testData(img_paths):
 
     img_paths = dp.getFilesInFolders(img_paths)
     for pth in img_paths:
+        print(f"Testing: {pth}")
         # Si hay multiples monedas en la imagen debe estar indicado con M
         _, nc = dp.getClass(pth)
 
@@ -182,7 +183,7 @@ def testData(img_paths):
 
         img = pth.split("\\")[-1]
         img = img.split("/")[-1]
-        pth = f"{pth[:-len(img)-1]}_CROPPED_NOYELLOWSHADOWS"
+        pth = f"{pth[:-len(img)-1]}_CROPPED_TEST"
         if not os.path.exists(pth):
             os.makedirs(pth)
         img = img.split(".")

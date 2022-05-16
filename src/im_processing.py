@@ -66,7 +66,11 @@ class ImProcessing:
         ksize = int(h / dp.HLINES_KERNEL_RATIO)
         fm = cv2.Laplacian(img, cv2.CV_64F).var()
         if fm < 600:
+            print(f"FM-> {fm}")
             ksize = int(ksize * 0.7)
+        if fm < 300:
+            ksize = int(ksize * 0.7)
+
         ksize = ksize if ksize % 2 else ksize - 1
         sigma = (ksize - 1) / 6
 
@@ -77,7 +81,7 @@ class ImProcessing:
     @classmethod
     def edgesInside(cls, img):
         aux = img
-        for _ in range(1):
+        for _ in range(2):
             # Aplicamos un suavizado para eliminar ruidos
             aux = cls.gaussBlur(aux)
             aux = cls.clahe(aux)
@@ -203,8 +207,9 @@ class ImProcessing:
         for image in images:
             equalized = cls.clahe(image)
             ocr_data = cls.getOCR(equalized)  # Lectura de caracteres
-            reduced = cls.removeExternalRing(image, 0.9)
-            ring = cls.getOuterRing(reduced, 0.65)
+            reduced = cls.removeExternalRing(image, 0.95)
+            ring = cls.getOuterRing(reduced, 0.6)
+            ring = cls.clahe(ring)
             rings2compare = [
                 cv2.imread(ring, 0) for ring in dp.getFilesInFolders([dp.RINGS_FOLDER])
             ]
@@ -251,10 +256,6 @@ class ImProcessing:
                 plt.imshow(image)
 
                 if ncoins > 0:
-                    # plt.subplot(243)
-                    # plt.title("Canny")
-                    # plt.imshow(self.DCanny, 'gray')
-
                     plt.subplot(243)
                     plt.title("Circles")
                     plt.imshow(cls.DCircles)
@@ -266,33 +267,20 @@ class ImProcessing:
     @classmethod
     def cropCircle(cls, img: cv2.Mat, ncoins=1) -> list[cv2.Mat]:
 
+        # Si el fondo es blanco hacemos correcion de sombras
         _, threshold = cv2.threshold(img, 127, 255, cv2.THRESH_BINARY)
-        if threshold[0, 0, 0] == 255:
-            percent = 1
-            img = cls.correction(
-                img, percent, percent, 500, percent, percent, 500, percent
-            )
 
         height, width = img.shape[:2]
         # Aplicamos un suavizado para eliminar ruidos
         blurred = cls.gaussBlur(img)
 
-        # plt.imshow(blurred, 'gray')
-        # plt.show()
-        # Obtenemos los bordes de la imagen
-        # (Multiplicamos la imagen por dos para aumentar las diferencias de intensidades)
-        edges = cv2.Canny(blurred * 2, dp.CANNY_TRHES1, dp.CANNY_TRHES2)
+        _, threshold = cv2.threshold(blurred, 127, 255, cv2.THRESH_BINARY)
+        threshold = cv2.cvtColor(threshold, cv2.COLOR_BGR2GRAY)
 
-        ksize = int(img.shape[0] / dp.HLINES_KERNEL_RATIO)
-        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (ksize, ksize))
-        morphed = cv2.morphologyEx(edges, cv2.MORPH_DILATE, kernel, iterations=1)
-        # kernel = cv2.getStructuringElement(
-        #     cv2.MORPH_ELLIPSE, (int(ksize/2), int(ksize/2)))
-        # morphed = cv2.morphologyEx(
-        #     morphed, cv2.MORPH_OPEN, kernel, iterations=1)
-        # -- {DEBUG} --
-        # if DEBUG:
-        #     self.DCanny = morphed
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (51, 51))
+        morphed = cv2.morphologyEx(threshold, cv2.MORPH_CLOSE, kernel, iterations=1)
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (51, 51))
+        morphed = cv2.morphologyEx(morphed, cv2.MORPH_OPEN, kernel, iterations=1)
         # -------------
         #   Obtenemos los circulos
         cdp = int(height / 255)
@@ -317,7 +305,7 @@ class ImProcessing:
         cropped_ls = []
         # Pasamos a escala BGR para pocer marcar la imagen con colores
         if DEBUG:
-            show = img.copy()
+            show = cv2.cvtColor(morphed.copy(), cv2.COLOR_GRAY2BGR)
         # Por cada circulo:
         deleted = 0
         for idx, i in enumerate(circles[0, :]):
@@ -353,8 +341,7 @@ class ImProcessing:
             # Nos salimos del bucle cuando hemos seleccionado el numero de monedas especificado
             if idx >= ncoins - 1 and (deleted > 3 or not miss):
                 break
-        # plt.imshow(show)
-        # plt.show()
+
         return cropped_ls
 
     @staticmethod
@@ -404,6 +391,8 @@ class ImProcessing:
         kps = cv2.goodFeaturesToTrack(
             np.float32(kps_img), dp.KP_MAXCORNERS, dp.KP_QUALITY, dp.KP_MINDIST
         )
+        kps_img = cv2.cvtColor(kps_img, cv2.COLOR_GRAY2BGR)
+
         # Marcamos los puntos en la imagen para mostrarla
         for corner in kps:
             x, y = corner.ravel()
@@ -484,8 +473,11 @@ class ImProcessing:
 
         return rotated, (cmx, cmy, dist, angle)
 
-    @staticmethod
-    def compareImgs(img1: cv2.Mat, img2_ls: list[cv2.Mat]):
+    @classmethod
+    def compareImgs(cls, img1: cv2.Mat, img2_ls: list[cv2.Mat]):
+        img1 = cv2.resize(img1, (512, 512))
+        img1 = cls.gaussBlur(img1)
+        img1 = cv2.Canny(img1, dp.CANNY_TRHES1, dp.CANNY_TRHES2)
         sift = cv2.SIFT_create()
         kp1, des1 = sift.detectAndCompute(img1, None)
 
@@ -495,6 +487,8 @@ class ImProcessing:
 
         data = {}
         for i, img2 in enumerate(img2_ls):
+            img2 = cls.gaussBlur(img2)
+            img2 = cv2.Canny(img2, dp.CANNY_TRHES1, dp.CANNY_TRHES2)
             kp2, des2 = sift.detectAndCompute(img2, None)
             matches = flann.knnMatch(des1, des2, k=2)
 
@@ -510,8 +504,8 @@ class ImProcessing:
             r = len(good_points) / min(len(kp1), len(kp2))
             data[f"RING_SIMILARITY_{i}"] = r
 
-            plt.imshow(matching_result)
-            plt.title("SIFT")
-            plt.show()
+            # plt.imshow(matching_result)
+            # plt.title("SIFT")
+            # plt.show()
 
         return data
