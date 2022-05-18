@@ -65,8 +65,8 @@ class ImProcessing:
         # Aplicamos un suavizado para eliminar ruidos
         ksize = int(h / dp.HLINES_KERNEL_RATIO)
         fm = cv2.Laplacian(img, cv2.CV_64F).var()
+        # print(f"FM-> {fm}")
         if fm < 600:
-            print(f"FM-> {fm}")
             ksize = int(ksize * 0.7)
         if fm < 300:
             ksize = int(ksize * 0.7)
@@ -204,23 +204,23 @@ class ImProcessing:
         # Obtenemos el nombre del archivo
         class_id, _ = dp.getClass(img_path)
         # Si hay varias monedas en una misma imagen procesamos todas
+        rings2compare = [
+            cv2.imread(ring, 0) for ring in dp.getFilesInFolders([dp.RINGS_FOLDER])
+        ]
         for image in images:
             equalized = cls.clahe(image)
             ocr_data = cls.getOCR(equalized)  # Lectura de caracteres
-            reduced = cls.removeExternalRing(image, 0.95)
-            ring = cls.getOuterRing(reduced, 0.6)
-            ring = cls.clahe(ring)
-            rings2compare = [
-                cv2.imread(ring, 0) for ring in dp.getFilesInFolders([dp.RINGS_FOLDER])
-            ]
-            ring_similarities = cls.compareImgs(ring, rings2compare)
+            reduced = cls.removeExternalRing(image, 0.9)
+            no_ring = cls.getOuterRing(reduced, 0.65)
+            no_ring = cls.clahe(no_ring)
+            ring_similarities = cls.compareImgs(no_ring, rings2compare)
             keyP = cls.keyPoints(reduced)  # Obtenemos info delas esquinas
             # Ajustamos el tamaño
             resized = cv2.resize(reduced, (dp.IM_SIZE_ADJ, dp.IM_SIZE_ADJ))
             gray_rs = cv2.cvtColor(resized, cv2.COLOR_BGR2GRAY)
             Hu = cls.huMoments(gray_rs)  # Obtenemos los momentos de Hu
-            edges = cls.edgesInside(image)
-            edges = cls.removeExternalRing(edges, 0.7)
+            reduced = cls.removeExternalRing(image, 0.65)
+            edges = cls.edgesInside(reduced)
 
             # Calculamos centro de gravedad y orientamos imgaen
             rotated, cog = cls.normalizeOrientation(edges, edges)
@@ -346,12 +346,17 @@ class ImProcessing:
 
     @staticmethod
     def getOCR(img: cv2.Mat) -> list[str]:
+        h, w = img.shape[:2]
         # Creamos el reader
         reader = easyocr.Reader(["en"])
         # Leemos la moneda
         output = reader.readtext(img)
+        M = cv2.getRotationMatrix2D((h / 2, w / 2), 360 / dp.OCR_N_READS, 1)
+        for _ in range(dp.OCR_N_READS - 1):
+            rotated = cv2.warpAffine(img, M, (w, h))
+            output += reader.readtext(rotated)
 
-        textos = []
+        textos = set()
         copy = img.copy()
         for tupla in output:
             if tupla[-1] > dp.OCR_MINRATE:
@@ -365,7 +370,7 @@ class ImProcessing:
                 # -------------
 
                 # Si el indice de acierto es > 70%
-                textos.append(tupla[1])
+                textos.add(tupla[1])
 
         if DEBUG:
             plt.subplot(244)
@@ -386,7 +391,8 @@ class ImProcessing:
     @classmethod
     def keyPoints(cls, img: cv2.Mat):
         # Detección de esquinas
-        kps_img = cv2.cvtColor(cls.gaussBlur(img), cv2.COLOR_BGR2GRAY)
+        kps_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        kps_img = cls.gaussBlur(kps_img)
 
         kps = cv2.goodFeaturesToTrack(
             np.float32(kps_img), dp.KP_MAXCORNERS, dp.KP_QUALITY, dp.KP_MINDIST
@@ -476,8 +482,8 @@ class ImProcessing:
     @classmethod
     def compareImgs(cls, img1: cv2.Mat, img2_ls: list[cv2.Mat]):
         img1 = cv2.resize(img1, (512, 512))
-        img1 = cls.gaussBlur(img1)
-        img1 = cv2.Canny(img1, dp.CANNY_TRHES1, dp.CANNY_TRHES2)
+        # img1 = cls.gaussBlur(img1)
+        # img1 = cv2.Canny(img1, dp.CANNY_TRHES1, dp.CANNY_TRHES2)
         sift = cv2.SIFT_create()
         kp1, des1 = sift.detectAndCompute(img1, None)
 
@@ -487,8 +493,8 @@ class ImProcessing:
 
         data = {}
         for i, img2 in enumerate(img2_ls):
-            img2 = cls.gaussBlur(img2)
-            img2 = cv2.Canny(img2, dp.CANNY_TRHES1, dp.CANNY_TRHES2)
+            # img2 = cls.gaussBlur(img2)
+            # img2 = cv2.Canny(img2, dp.CANNY_TRHES1, dp.CANNY_TRHES2)
             kp2, des2 = sift.detectAndCompute(img2, None)
             matches = flann.knnMatch(des1, des2, k=2)
 
