@@ -219,7 +219,7 @@ class ImProcessing:
         class_id, _ = dp.getClass(img_path)
         # Si hay varias monedas en una misma imagen procesamos todas
         rings2compare = [
-            cv2.imread(ring, 0) for ring in dp.getFilesInFolders([dp.RINGS_FOLDER])
+            cv2.imread(ring) for ring in dp.getFilesInFolders([dp.RINGS_FOLDER])
         ]
         for image in images:
             equalized = cls.clahe(image)
@@ -227,11 +227,12 @@ class ImProcessing:
             # Ajustamos el tamaño
             resized = cv2.resize(reduced, (dp.IM_SIZE_ADJ, dp.IM_SIZE_ADJ))
             edges = cls.edgesInside(reduced)
-            ring_edges = cls.getOuterRing(edges, 0.72)
-            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
-            ring_edges_dilated = cv2.morphologyEx(
-                ring_edges, cv2.MORPH_DILATE, kernel, iterations=1
-            )
+            # ring_edges = cls.getOuterRing(edges, 0.72)
+            ring = cls.getOuterRing(reduced, 0.72)
+            # kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+            # ring_edges_dilated = cv2.morphologyEx(
+            #     ring_edges, cv2.MORPH_DILATE, kernel, iterations=1
+            # )
             edges_without_ring = cls.removeExternalRing(edges, 0.72)
             # Lectura de caracteres
             data_ocr = cls.getOCR(equalized)
@@ -240,7 +241,7 @@ class ImProcessing:
             # Obtenemos los momentos de Hu
             data_Hu = cls.huMoments(resized)
             # Obtenemos la similitud con diferentes anillos
-            data_ring_similarities = cls.compareImgs(ring_edges_dilated, rings2compare)
+            data_ring_similarities = cls.compareImgs(ring, rings2compare)
             # Calculamos centro de gravedad y orientamos imgaen
             rotated, data_center_of_gravity = cls.normalizeOrientation(
                 edges_without_ring, edges_without_ring

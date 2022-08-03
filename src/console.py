@@ -129,7 +129,7 @@ def addCoins(img_paths):
         # Escribimos los datos en el archivo csv
         writeCSV(data)
         end_time = time.time()
-        print(f"TIME ELAPSED: {start_time-end_time}")
+        print(f"TIME ELAPSED: {end_time-start_time}")
         # -- POR COMPLETAR --
 
     except cv2.error:  # Tratamos cuando no encuentra el archivo
