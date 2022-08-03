@@ -8,6 +8,20 @@ import numpy as np
 import cv2
 import easyocr
 
+from sewar.full_ref import (
+    mse,
+    rmse,
+    psnr,
+    uqi,
+    ssim,
+    ergas,
+    scc,
+    rase,
+    sam,
+    msssim,
+    vifp,
+)
+
 DEBUG = False
 
 
@@ -188,7 +202,7 @@ class ImProcessing:
     @classmethod
     def extractData(cls, img_path: str, ncoins=1) -> dict[str, list]:
 
-        print(f"Identificando imagen: {img_path}")
+        print(f"----------------------------\nIdentificando imagen: {img_path}")
         img = cv2.imread(img_path)[:, :, ::-1]  # Lee imagen
         # -- Ajustes de imagen para que sigan un mismo formato --
         if ncoins > 0:
@@ -209,41 +223,49 @@ class ImProcessing:
         ]
         for image in images:
             equalized = cls.clahe(image)
-            ocr_data = cls.getOCR(equalized)  # Lectura de caracteres
             reduced = cls.removeExternalRing(image, 0.9)
-            no_ring = cls.getOuterRing(reduced, 0.65)
-            no_ring = cls.clahe(no_ring)
-            ring_similarities = cls.compareImgs(no_ring, rings2compare)
-            keyP = cls.keyPoints(reduced)  # Obtenemos info delas esquinas
             # Ajustamos el tamaño
             resized = cv2.resize(reduced, (dp.IM_SIZE_ADJ, dp.IM_SIZE_ADJ))
-            gray_rs = cv2.cvtColor(resized, cv2.COLOR_BGR2GRAY)
-            Hu = cls.huMoments(gray_rs)  # Obtenemos los momentos de Hu
-            reduced = cls.removeExternalRing(image, 0.65)
             edges = cls.edgesInside(reduced)
-
+            ring_edges = cls.getOuterRing(edges, 0.72)
+            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+            ring_edges_dilated = cv2.morphologyEx(
+                ring_edges, cv2.MORPH_DILATE, kernel, iterations=1
+            )
+            edges_without_ring = cls.removeExternalRing(edges, 0.72)
+            # Lectura de caracteres
+            data_ocr = cls.getOCR(equalized)
+            # Obtenemos info delas esquinas
+            data_keyP_wr = cls.keyPoints(reduced)  # WITH RING
+            # Obtenemos los momentos de Hu
+            data_Hu = cls.huMoments(resized)
+            # Obtenemos la similitud con diferentes anillos
+            data_ring_similarities = cls.compareImgs(ring_edges_dilated, rings2compare)
             # Calculamos centro de gravedad y orientamos imgaen
-            rotated, cog = cls.normalizeOrientation(edges, edges)
+            rotated, data_center_of_gravity = cls.normalizeOrientation(
+                edges_without_ring, edges_without_ring
+            )
+            # Obtenemos información de las líneas
             lines = cls.getLines(rotated)
-            lines_data = dp.getLinesData(lines, rotated.shape[0])
+            data_lines = dp.getLinesData(lines, rotated.shape[0])
 
             # Guardamos los datos obtenidos en el diccionario
-            data.get("HU_1").append(Hu[0])
-            data.get("HU_2").append(Hu[1])
-            data.get("CG_X").append(cog[0])
-            data.get("CG_Y").append(cog[1])
-            data.get("CG_DIST").append(cog[2])
-            data.get("CG_ANGLE").append(cog[3])
-            data.get("CKP_X").append(keyP[0])
-            data.get("CKP_Y").append(keyP[1])
-            data.get("CKP_DIST").append(keyP[2])
-            data.get("CKP_ANGLE").append(keyP[3])
-            for k in lines_data:
-                data.get(k).append(lines_data[k])
-            for k in ring_similarities:
-                data.get(k).append(ring_similarities[k])
+            data.get("HU_1").append(data_Hu[0])
+            data.get("HU_2").append(data_Hu[1])
+            data.get("CG_X").append(data_center_of_gravity[0])
+            data.get("CG_Y").append(data_center_of_gravity[1])
+            data.get("CG_DIST").append(data_center_of_gravity[2])
+            data.get("CG_ANGLE").append(data_center_of_gravity[3])
+            data.get("CKP_X").append(data_keyP_wr[0])
+            data.get("CKP_Y").append(data_keyP_wr[1])
+            data.get("CKP_DIST").append(data_keyP_wr[2])
+            data.get("CKP_ANGLE").append(data_keyP_wr[3])
+            for k in data_lines:
+                data.get(k).append(data_lines[k])
+            for k in data_ring_similarities:
+                data.get(k).append(data_ring_similarities[k])
 
-            dp.appendOcrData(ocr_data, data)
+            dp.appendOcrData(data_ocr, data)
             data.get("CLASS").append(class_id)
 
             if DEBUG:
@@ -295,12 +317,10 @@ class ImProcessing:
             maxRadius=2000,
         )
 
-        # Muestra cuantos circulos se han encontrado
-        print(f"Detectados {len(circles[0,:])} Circulos")
         # Obtenemos la mediana de los radios
 
         rcoin = circles[0, 0, 2]
-        print(f"Coin Size -> {rcoin}")
+        print(f"Coin radius (px) -> {rcoin}")
 
         cropped_ls = []
         # Pasamos a escala BGR para pocer marcar la imagen con colores
@@ -318,7 +338,7 @@ class ImProcessing:
 
             # Borra circulos de tamaño desproporcionado
             if r > rcoin * 1.2 or r < rcoin * 0.8:
-                print(f"Borra circulo: x={x} y={y} r={r}")
+                print(f"Bad circle: x={x} y={y} r={r}")
                 miss = True
                 deleted += 1
                 continue
@@ -341,6 +361,8 @@ class ImProcessing:
             # Nos salimos del bucle cuando hemos seleccionado el numero de monedas especificado
             if idx >= ncoins - 1 and (deleted > 3 or not miss):
                 break
+        # Muestra cuantos circulos se han encontrado
+        print(f"Extracted {ncoins} circles")
 
         return cropped_ls
 
@@ -356,12 +378,12 @@ class ImProcessing:
             rotated = cv2.warpAffine(img, M, (w, h))
             output += reader.readtext(rotated)
 
-        textos = set()
+        palabras = set()
         copy = img.copy()
+        print(f"Good words ->", end=" ")
         for tupla in output:
-            if tupla[-1] > dp.OCR_MINRATE:
-                cord = tupla[0]
-
+            cord, palabra, percent = tupla
+            if percent > dp.OCR_MINRATE:
                 # -- DEBUG --
                 #  Muestra  donde detecto los caracteres
                 x_min, y_min = [int(min(idx)) for idx in zip(*cord)]
@@ -370,20 +392,21 @@ class ImProcessing:
                 # -------------
 
                 # Si el indice de acierto es > 70%
-                textos.add(tupla[1])
-
+                palabras.add(palabra)
+                print(f"{palabra} ({round(percent,2)})", end=" ")
+        print()
         if DEBUG:
             plt.subplot(244)
             plt.imshow(copy)
             plt.title("OCR")
 
-        print(f"Palabras encontradas -> {textos}")
-        return textos
+        return palabras
 
     @staticmethod
     def huMoments(img: cv2.Mat) -> list:
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         # Calculamos los momentos estadisticos hasta los de primera orden
-        M = cv2.moments(img, False)
+        M = cv2.moments(gray, False)
         # Calculamos los momentos de Hu y nos quedamos con los dos primeros
         Hm = cv2.HuMoments(M).flatten()[0 : dp.N_HUMOMS]
         return Hm
@@ -482,36 +505,22 @@ class ImProcessing:
     @classmethod
     def compareImgs(cls, img1: cv2.Mat, img2_ls: list[cv2.Mat]):
         img1 = cv2.resize(img1, (512, 512))
-        # img1 = cls.gaussBlur(img1)
-        # img1 = cv2.Canny(img1, dp.CANNY_TRHES1, dp.CANNY_TRHES2)
-        sift = cv2.SIFT_create()
-        kp1, des1 = sift.detectAndCompute(img1, None)
-
-        index_params = dict(algorithm=0, trees=5)
-        search_params = dict()
-        flann = cv2.FlannBasedMatcher(index_params, search_params)
 
         data = {}
-        for i, img2 in enumerate(img2_ls):
-            # img2 = cls.gaussBlur(img2)
-            # img2 = cv2.Canny(img2, dp.CANNY_TRHES1, dp.CANNY_TRHES2)
-            kp2, des2 = sift.detectAndCompute(img2, None)
-            matches = flann.knnMatch(des1, des2, k=2)
+        print(f"Ring similarities ->", end=" ")
+        for i, img2 in enumerate(img2_ls, start=1):
 
-            good_points = []
-            for m, n in matches:
-                if m.distance < dp.SIFT_PERCENTAGE_FOR_GP * n.distance:
-                    good_points.append(m)
-
-            matching_result = cv2.drawMatches(
-                img1, kp1, img2, kp2, good_points, None, flags=2
-            )
-
-            r = len(good_points) / min(len(kp1), len(kp2))
-            data[f"RING_SIMILARITY_{i}"] = r
-
-            # plt.imshow(matching_result)
-            # plt.title("SIFT")
-            # plt.show()
-
+            data[f"RING_MSE_{i}"] = mse(img1, img2)
+            data[f"RING_RMSE_{i}"] = rmse(img1, img2)
+            data[f"RING_PSNR_{i}"] = psnr(img1, img2)
+            data[f"RING_UQI_{i}"] = uqi(img1, img2)
+            data[f"RING_SSIM_{i}"] = ssim(img1, img2)[1]
+            data[f"RING_ERGAS_{i}"] = ergas(img1, img2)
+            data[f"RING_SCC_{i}"] = scc(img1, img2)
+            # data[f"RING_RASE_{i}"] = rase(img1, img2)
+            data[f"RING_SAM_{i}"] = sam(img1, img2)
+            data[f"RING_MSSSIM_{i}"] = np.real(msssim(img1, img2))
+            data[f"RING_VIF_{i}"] = vifp(img1, img2)
+            # cls.quickShow(np.concatenate((img1, img2), axis=1))
+        print(data)
         return data

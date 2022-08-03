@@ -13,7 +13,7 @@ FILE_COIN_WORDS = PROJECT_ROOT / "conf" / "coin_words.txt"
 OUT_FOLDER = PROJECT_ROOT / "data"
 RINGS_FOLDER = "conf/RINGS"
 
-IM_SIZE_ADJ = 255
+IM_SIZE_ADJ = 512
 
 CANNY_TRHES1 = 50
 CANNY_TRHES2 = 100
@@ -89,8 +89,18 @@ def initData():
     }
     for word in COIN_WORDS:
         data.update({f"OCR_{word[:-1]}": []})
-    for i in range(len(RING_FILES)):
-        data.update({f"RING_SIMILARITY_{i}": []})
+    for i in range(1, len(RING_FILES) + 1):
+        data.update({f"RING_MSE_{i}": []})
+        data.update({f"RING_RMSE_{i}": []})
+        data.update({f"RING_PSNR_{i}": []})
+        data.update({f"RING_UQI_{i}": []})
+        data.update({f"RING_SSIM_{i}": []})
+        data.update({f"RING_ERGAS_{i}": []})
+        data.update({f"RING_SCC_{i}": []})
+        # data.update({f"RING_RASE_{i}": []})
+        data.update({f"RING_SAM_{i}": []})
+        data.update({f"RING_MSSSIM_{i}": []})
+        data.update({f"RING_VIF_{i}": []})
     data.update({"CLASS": []})
     return data
 

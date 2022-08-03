@@ -4,6 +4,7 @@ import data_processing as dp
 import traceback
 import sys
 import os
+import time
 
 import csv
 import cv2
@@ -109,6 +110,7 @@ def addCoins(img_paths):
             return
 
     try:
+        start_time = time.time()
 
         img_paths = dp.getFilesInFolders(img_paths)
         # Extraemos datos de todas la imagenes especificadas
@@ -126,6 +128,8 @@ def addCoins(img_paths):
 
         # Escribimos los datos en el archivo csv
         writeCSV(data)
+        end_time = time.time()
+        print(f"TIME ELAPSED: {start_time-end_time}")
         # -- POR COMPLETAR --
 
     except cv2.error:  # Tratamos cuando no encuentra el archivo
