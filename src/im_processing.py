@@ -5,6 +5,7 @@ import math
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import cv2
 import easyocr
 
@@ -23,6 +24,12 @@ from sewar.full_ref import (
 )
 
 DEBUG = False
+EXTRACT_OCR = False
+EXTRACT_KEYPWR = False
+EXTRACT_HU = False
+EXTRACT_RINGSIMS = False
+EXTRACT_COG = False
+EXTRACT_LINES = False
 
 
 class ImProcessing:
@@ -214,7 +221,7 @@ class ImProcessing:
             images = [img]
 
         # Diccionario de listas de datos para exportar al archivo csv
-        data = dp.initData()
+        all_data = dp.initData()
         # Obtenemos el nombre del archivo
         class_id, _ = dp.getClass(img_path)
         # Si hay varias monedas en una misma imagen procesamos todas
@@ -222,6 +229,7 @@ class ImProcessing:
             cv2.imread(ring) for ring in dp.getFilesInFolders([dp.RINGS_FOLDER])
         ]
         for image in images:
+            data = {}
             equalized = cls.clahe(image)
             reduced = cls.removeExternalRing(image, 0.9)
             # Ajustamos el tamaño
@@ -235,39 +243,62 @@ class ImProcessing:
             # )
             edges_without_ring = cls.removeExternalRing(edges, 0.72)
             # Lectura de caracteres
-            data_ocr = cls.getOCR(equalized)
-            # Obtenemos info delas esquinas
-            data_keyP_wr = cls.keyPoints(reduced)  # WITH RING
+            if EXTRACT_OCR:
+                data_ocr = cls.getOCR(equalized)
+                dp.appendOcrData(data_ocr, data)
+
+            # Obtenemos info delas esquinas WITH RINGS
+            if EXTRACT_KEYPWR:
+                data_keyP_wr = cls.keyPoints(reduced)
+                data.update(
+                    {
+                        "CKP_X": data_keyP_wr[0],
+                        "CKP_Y": data_keyP_wr[1],
+                        "CKP_DIST": data_keyP_wr[2],
+                        "CKP_ANGLE": data_keyP_wr[3],
+                    }
+                )
             # Obtenemos los momentos de Hu
-            data_Hu = cls.huMoments(resized)
+            if EXTRACT_HU:
+                data_Hu = cls.huMoments(resized)
+                data.update(
+                    {
+                        "HU_1": data_Hu[0],
+                        "HU_2": data_Hu[1],
+                    }
+                )
             # Obtenemos la similitud con diferentes anillos
-            data_ring_similarities = cls.compareImgs(ring, rings2compare)
+            if EXTRACT_RINGSIMS:
+                data_ring_similarities = cls.compareImgs(ring, rings2compare)
+                for key in data_ring_similarities:
+                    data[key] = data_ring_similarities[key]
             # Calculamos centro de gravedad y orientamos imgaen
-            rotated, data_center_of_gravity = cls.normalizeOrientation(
-                edges_without_ring, edges_without_ring
-            )
-            # Obtenemos información de las líneas
-            lines = cls.getLines(rotated)
-            data_lines = dp.getLinesData(lines, rotated.shape[0])
+            if EXTRACT_COG:
+                rotated, data_center_of_gravity = cls.normalizeOrientation(
+                    edges_without_ring, edges_without_ring
+                )
+                data.update(
+                    {
+                        "CG_X": data_center_of_gravity[0],
+                        "CG_Y": data_center_of_gravity[1],
+                        "CG_DIST": data_center_of_gravity[2],
+                        "CG_ANGLE": data_center_of_gravity[3],
+                    }
+                )
+                # Obtenemos información de las líneas
+                if EXTRACT_LINES:
+                    lines = cls.getLines(rotated)
+                    data_lines = dp.getLinesData(lines, rotated.shape[0])
+                    for key in data_lines:
+                        data[key] = data_lines[key]
 
-            # Guardamos los datos obtenidos en el diccionario
-            data.get("HU_1").append(data_Hu[0])
-            data.get("HU_2").append(data_Hu[1])
-            data.get("CG_X").append(data_center_of_gravity[0])
-            data.get("CG_Y").append(data_center_of_gravity[1])
-            data.get("CG_DIST").append(data_center_of_gravity[2])
-            data.get("CG_ANGLE").append(data_center_of_gravity[3])
-            data.get("CKP_X").append(data_keyP_wr[0])
-            data.get("CKP_Y").append(data_keyP_wr[1])
-            data.get("CKP_DIST").append(data_keyP_wr[2])
-            data.get("CKP_ANGLE").append(data_keyP_wr[3])
-            for k in data_lines:
-                data.get(k).append(data_lines[k])
-            for k in data_ring_similarities:
-                data.get(k).append(data_ring_similarities[k])
+            data["CLASS"] = class_id
 
-            dp.appendOcrData(data_ocr, data)
-            data.get("CLASS").append(class_id)
+            for key in all_data:
+                if data.get(key) is not None:
+                    all_data[key].append(data[key])
+                else:
+                    all_data[key].append(None)
 
             if DEBUG:
                 plt.subplot(241)
@@ -285,7 +316,7 @@ class ImProcessing:
 
                 plt.show()
 
-        return data
+        return all_data
 
     @classmethod
     def cropCircle(cls, img: cv2.Mat, ncoins=1) -> list[cv2.Mat]:

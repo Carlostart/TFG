@@ -41,8 +41,12 @@ MIN_CENTERS_DIST = 500
 
 SIFT_PERCENTAGE_FOR_GP = 0.7
 
-with open(FILE_COIN_WORDS, "r") as f:
-    COIN_WORDS = set(f.readlines())
+# with open(FILE_COIN_WORDS, "r") as f:
+#     COIN_WORDS = set(f.readlines())
+
+OCR_CHARS = [
+    chr(i) for i in [*range(ord("A"), ord("Z") + 1), *range(ord("0"), ord("9") + 1)]
+]
 
 
 def getFilesInFolders(pths):
@@ -87,8 +91,13 @@ def initData():
         "LONGEST_LEN": [],
         "LONGEST_ANGLE": [],
     }
-    for word in COIN_WORDS:
-        data.update({f"OCR_{word[:-1]}": []})
+    # for word in COIN_WORDS:
+    #     data.update({f"OCR_{word[:-1]}": []})
+    for letter in OCR_CHARS:
+        data.update({f"OCR_{letter}": []})
+    for number in range(10):
+        data.update({f"OCR_{number}": []})
+
     for i in range(1, len(RING_FILES) + 1):
         data.update({f"RING_MSE_{i}": []})
         data.update({f"RING_RMSE_{i}": []})
@@ -120,13 +129,22 @@ def getClass(pth):
     return class_id, ncoins
 
 
+# def appendOcrData(ocr_data, data):
+#     for word in COIN_WORDS:
+#         m = 0
+#         for ocr in ocr_data:
+#             aux = SM(None, word[:-1], ocr).ratio()
+#             m = max(m, aux)
+#         data.get(f"OCR_{word[:-1]}").append(m)
+
+
 def appendOcrData(ocr_data, data):
-    for word in COIN_WORDS:
-        m = 0
+    for ch in OCR_CHARS:
+        count = 0
         for ocr in ocr_data:
-            aux = SM(None, word[:-1], ocr).ratio()
-            m = max(m, aux)
-        data.get(f"OCR_{word[:-1]}").append(m)
+            if ch in ocr:
+                count += 1
+        data[f"OCR_{ch}"] = count
 
 
 def getLinesData(lines: list, img_size: int):

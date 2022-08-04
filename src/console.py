@@ -5,6 +5,7 @@ import traceback
 import sys
 import os
 import time
+import pandas as pd
 
 import csv
 import cv2
@@ -127,7 +128,9 @@ def addCoins(img_paths):
                     data[k] += d[k]
 
         # Escribimos los datos en el archivo csv
-        writeCSV(data)
+        # print(data)
+        # writeCSV(pd.DataFrame.from_dict(data))
+        pd.DataFrame.from_dict(data).to_csv(dp.FILE_CSV)
         end_time = time.time()
         print(f"TIME ELAPSED: {end_time-start_time}")
         # -- POR COMPLETAR --
@@ -136,18 +139,20 @@ def addCoins(img_paths):
         traceback.print_exc()
         print("Archivo no encontrado")
     except ValueError:  # Error en el formato del nombre del archivo
+        traceback.print_exc()
         print("Error: Seguir formato -> add PATH_1,PATH_2,...PATH_N")
 
 
-def writeCSV(data):
+def writeCSV(data: pd.DataFrame):
     # Introduce los datos en file_csv
-    with open(dp.FILE_CSV, mode="w") as f:
-        writer = csv.writer(f)
-        # Atributos
-        writer.writerow(data.keys())
-        # Valores
-        r = [len(v) for v in data.values()]
-        writer.writerows(zip(*data.values()))
+    data.to_csv(dp.FILE_CSV)
+    # with open(dp.FILE_CSV, mode="w") as f:
+    #     writer = csv.writer(f)
+    #     # Atributos
+    #     writer.writerow(data.keys())
+    #     # Valores
+    #     r = [len(v) for v in data.values()]
+    #     writer.writerows(zip(*data.values()))
 
 
 def setInfo(args):
