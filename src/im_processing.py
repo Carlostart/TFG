@@ -5,7 +5,6 @@ import math
 
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 import cv2
 import easyocr
 
@@ -23,13 +22,7 @@ from sewar.full_ref import (
     vifp,
 )
 
-DEBUG = False
-EXTRACT_OCR = False
-EXTRACT_KEYPWR = False
-EXTRACT_HU = False
-EXTRACT_RINGSIMS = False
-EXTRACT_COG = False
-EXTRACT_LINES = False
+DEBUG = True
 
 
 class ImProcessing:
@@ -221,84 +214,69 @@ class ImProcessing:
             images = [img]
 
         # Diccionario de listas de datos para exportar al archivo csv
-        all_data = dp.initData()
+        data = dp.initData()
         # Obtenemos el nombre del archivo
         class_id, _ = dp.getClass(img_path)
         # Si hay varias monedas en una misma imagen procesamos todas
         rings2compare = [
-            cv2.imread(ring) for ring in dp.getFilesInFolders([dp.RINGS_FOLDER])
+            cv2.imread(ring, 0) for ring in dp.getFilesInFolders([dp.RINGS_FOLDER])
         ]
         for image in images:
-            data = {}
             equalized = cls.clahe(image)
             reduced = cls.removeExternalRing(image, 0.9)
             # Ajustamos el tamaño
             resized = cv2.resize(reduced, (dp.IM_SIZE_ADJ, dp.IM_SIZE_ADJ))
+            gray = cv2.cvtColor(resized, cv2.COLOR_BGR2GRAY)
             edges = cls.edgesInside(reduced)
-            # ring_edges = cls.getOuterRing(edges, 0.72)
-            ring = cls.getOuterRing(reduced, 0.72)
-            # kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
-            # ring_edges_dilated = cv2.morphologyEx(
-            #     ring_edges, cv2.MORPH_DILATE, kernel, iterations=1
-            # )
+            ring_edges = cls.getOuterRing(edges, 0.72)
+            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+            ring_edges_dilated = cv2.morphologyEx(
+                ring_edges, cv2.MORPH_DILATE, kernel, iterations=1
+            )
             edges_without_ring = cls.removeExternalRing(edges, 0.72)
             # Lectura de caracteres
-            if EXTRACT_OCR:
-                data_ocr = cls.getOCR(equalized)
-                dp.appendOcrData(data_ocr, data)
-
-            # Obtenemos info delas esquinas WITH RINGS
-            if EXTRACT_KEYPWR:
-                data_keyP_wr = cls.keyPoints(reduced)
-                data.update(
-                    {
-                        "CKP_X": data_keyP_wr[0],
-                        "CKP_Y": data_keyP_wr[1],
-                        "CKP_DIST": data_keyP_wr[2],
-                        "CKP_ANGLE": data_keyP_wr[3],
-                    }
-                )
+            data_ocr = cls.getOCR(equalized)
+            # Obtenemos info delas esquinas
+            data_keyP_wr = cls.keyPoints(reduced)  # WITH RING
             # Obtenemos los momentos de Hu
-            if EXTRACT_HU:
-                data_Hu = cls.huMoments(resized)
-                data.update(
-                    {
-                        "HU_1": data_Hu[0],
-                        "HU_2": data_Hu[1],
-                    }
-                )
+            data_Hu = cls.huMoments(resized)
             # Obtenemos la similitud con diferentes anillos
-            if EXTRACT_RINGSIMS:
-                data_ring_similarities = cls.compareImgs(ring, rings2compare)
-                for key in data_ring_similarities:
-                    data[key] = data_ring_similarities[key]
+            data_ring_similarities = cls.compareImgs(ring_edges_dilated, rings2compare)
             # Calculamos centro de gravedad y orientamos imgaen
-            if EXTRACT_COG:
-                rotated, data_center_of_gravity = cls.normalizeOrientation(
-                    edges_without_ring, edges_without_ring
-                )
-                data.update(
-                    {
-                        "CG_X": data_center_of_gravity[0],
-                        "CG_Y": data_center_of_gravity[1],
-                        "CG_DIST": data_center_of_gravity[2],
-                        "CG_ANGLE": data_center_of_gravity[3],
-                    }
-                )
-                # Obtenemos información de las líneas
-                if EXTRACT_LINES:
-                    lines = cls.getLines(rotated)
-                    data_lines = dp.getLinesData(lines, rotated.shape[0])
-                    for key in data_lines:
-                        data[key] = data_lines[key]
+            data_cog_gray = cls.center_of_gravity_info(gray)
 
-            data["CLASS"] = class_id
+            data_cog_canny = cls.center_of_gravity_info(edges_without_ring)
+            rotated = cls.normalize_orientations(
+                data_cog_canny[2], data_cog_canny[3], edges
+            )
+            # Obtenemos información de las líneas
+            lines = cls.getLines(rotated)
+            data_lines = dp.getLinesData(lines, rotated.shape[0])
 
-            for key in all_data:
-                if data.get(key) is not None:
-                    all_data[key].append(data[key])
-                else:
-                    all_data[key].append(None)
+            # Guardamos los datos obtenidos en el diccionario
+            data.get("HU_1").append(data_Hu[0])
+            data.get("HU_2").append(data_Hu[1])
+            data.get("CGG_X").append(data_cog_gray[0])
+            data.get("CGG_Y").append(data_cog_gray[1])
+            data.get("CGG_DIST").append(data_cog_gray[2])
+            data.get("CGG_ANGLE").append(data_cog_gray[3])
+            data.get("CGC_X").append(data_cog_canny[0])
+            data.get("CGC_Y").append(data_cog_canny[1])
+            data.get("CGC_DIST").append(data_cog_canny[2])
+            data.get("CGC_ANGLE").append(data_cog_canny[3])
+            data.get("CKP_N").append(data_keyP_wr[0])
+            data.get("CKP_X").append(data_keyP_wr[1])
+            data.get("CKP_Y").append(data_keyP_wr[2])
+            data.get("CKP_DIST").append(data_keyP_wr[3])
+            data.get("CKP_ANGLE").append(data_keyP_wr[4])
+            data.get("CGC_CKP_ANGLE").append(abs(data_keyP_wr[4] - data_cog_canny[3]))
+            for k in data_lines:
+                data.get(k).append(data_lines[k])
+            for k in data_ring_similarities:
+                data.get(k).append(data_ring_similarities[k])
+
+            dp.appendOcrData(data_ocr, data)
+            data.get("CLASS").append(class_id)
 
             if DEBUG:
                 plt.subplot(241)
@@ -316,7 +294,7 @@ class ImProcessing:
 
                 plt.show()
 
-        return all_data
+        return data
 
     @classmethod
     def cropCircle(cls, img: cv2.Mat, ncoins=1) -> list[cv2.Mat]:
@@ -470,7 +448,7 @@ class ImProcessing:
         c = int(h / 2)
         dist = np.sqrt((x - c) ** 2 + (y - c) ** 2) * dp.IM_SIZE_ADJ / h
         angle = math.degrees(math.atan2(y - c, x - c)) % 360
-        return x, y, dist, angle
+        return len(kps), x, y, dist, angle
 
     @classmethod
     def getLines(cls, edges: cv2.Mat):
@@ -504,35 +482,43 @@ class ImProcessing:
             return []
 
     @classmethod
-    def normalizeOrientation(cls, edges: cv2.Mat, image: cv2.Mat):
-        h, w = edges.shape
+    def normalize_orientations(cls, dist, angle, img: cv2.Mat):
+        h, w = img.shape
         cy, cx = h / 2, w / 2
-
-        cmy, cmx = ndi.center_of_mass(edges)
-
-        dist = np.sqrt((cx - cmx) ** 2 + (cy - cmy) ** 2) * dp.IM_SIZE_ADJ / h
-        print(f"Center Dist -> {dist}")
-        angle = math.degrees(math.atan2(cy - cmy, cx - cmx)) % 360
         if dist > dp.MIN_CENTERS_DIST:
             M = cv2.getRotationMatrix2D((cx, cy), angle + 180, 1)
-            rotated = cv2.warpAffine(image, M, (w, h))
+            rotated = cv2.warpAffine(img, M, (w, h))
         else:
-            rotated = image
+            rotated = img
 
         if DEBUG:
-            edges = cv2.cvtColor(edges, cv2.COLOR_GRAY2BGR)
-            plt.subplot(246)
-            cv2.circle(edges, (int(cx), int(cy)), 3, (255, 0, 0), cv2.FILLED)
-            cv2.circle(edges, (int(cmx), int(cmy)), 5, (0, 255, 0), cv2.FILLED)
-            cv2.line(edges, (int(cx), int(cy)), (int(cmx), int(cmy)), (0, 0, 255), 2)
-            plt.imshow(edges)
-            plt.title("Centers")
-
             plt.subplot(247)
             plt.imshow(rotated, "gray")
             plt.title("Rotated")
 
-        return rotated, (cmx, cmy, dist, angle)
+        return rotated
+
+    @classmethod
+    def center_of_gravity_info(cls, img: cv2.Mat):
+        h, w = img.shape
+        cy, cx = h / 2, w / 2
+
+        cmy, cmx = ndi.center_of_mass(img)
+
+        dist = np.sqrt((cx - cmx) ** 2 + (cy - cmy) ** 2) * dp.IM_SIZE_ADJ / h
+        print(f"Center Dist -> {dist}")
+        angle = math.degrees(math.atan2(cy - cmy, cx - cmx)) % 360
+
+        if DEBUG:
+            img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+            plt.subplot(246)
+            cv2.circle(img, (int(cx), int(cy)), 3, (255, 0, 0), cv2.FILLED)
+            cv2.circle(img, (int(cmx), int(cmy)), 5, (0, 255, 0), cv2.FILLED)
+            cv2.line(img, (int(cx), int(cy)), (int(cmx), int(cmy)), (0, 0, 255), 2)
+            plt.imshow(img)
+            plt.title("Centers")
+
+        return cmx, cmy, dist, angle
 
     @classmethod
     def compareImgs(cls, img1: cv2.Mat, img2_ls: list[cv2.Mat]):
