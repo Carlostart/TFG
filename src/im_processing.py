@@ -211,7 +211,7 @@ class ImProcessing:
     def extractData(cls, img_path: str, ncoins=1) -> dict[str, list]:
 
         print(
-            "-----------------------------------------\n"
+            "==========================================================\n"
             + f"Identificando imagen: {img_path}"
         )
         img = cv2.imread(img_path)[:, :, ::-1]  # Lee imagen
