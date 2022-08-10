@@ -22,7 +22,15 @@ from sewar.full_ref import (
     vifp,
 )
 
-DEBUG = True
+EXTRACT_OCR = True
+EXTRACT_KEYPWR = True
+EXTRACT_HU = True
+EXTRACT_RINGSIMS = True
+EXTRACT_COG_CANNY = True
+EXTRACT_COG_GRAY = True
+EXTRACT_LINES = True
+NORMALIZE_ORIENTATION = False
+DEBUG = False
 
 
 class ImProcessing:
@@ -202,7 +210,10 @@ class ImProcessing:
     @classmethod
     def extractData(cls, img_path: str, ncoins=1) -> dict[str, list]:
 
-        print(f"----------------------------\nIdentificando imagen: {img_path}")
+        print(
+            "-----------------------------------------\n"
+            + f"Identificando imagen: {img_path}"
+        )
         img = cv2.imread(img_path)[:, :, ::-1]  # Lee imagen
         # -- Ajustes de imagen para que sigan un mismo formato --
         if ncoins > 0:
@@ -214,69 +225,134 @@ class ImProcessing:
             images = [img]
 
         # Diccionario de listas de datos para exportar al archivo csv
-        data = dp.initData()
+        all_data = dp.initData()
         # Obtenemos el nombre del archivo
         class_id, _ = dp.getClass(img_path)
+        print(f"CLASS ID -> {class_id}")
         # Si hay varias monedas en una misma imagen procesamos todas
         rings2compare = [
-            cv2.imread(ring, 0) for ring in dp.getFilesInFolders([dp.RINGS_FOLDER])
+            cv2.imread(ring) for ring in dp.getFilesInFolders([dp.RINGS_FOLDER])
         ]
         for image in images:
+            data = {}
+            # Aplicamos CLAHE y eliminamos el borde exterior de la moneda
             equalized = cls.clahe(image)
             reduced = cls.removeExternalRing(image, 0.9)
-            # Ajustamos el tamaño
+            # Procesamos la imagen ajustando el tamaño, haciendo escala de grises y calculando bordes
             resized = cv2.resize(reduced, (dp.IM_SIZE_ADJ, dp.IM_SIZE_ADJ))
             gray = cv2.cvtColor(resized, cv2.COLOR_BGR2GRAY)
             edges = cls.edgesInside(reduced)
+            # Separamos el anillo de la moneda en diferentes formatos
+            ring = cls.getOuterRing(reduced, 0.72)
             ring_edges = cls.getOuterRing(edges, 0.72)
             kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
             ring_edges_dilated = cv2.morphologyEx(
                 ring_edges, cv2.MORPH_DILATE, kernel, iterations=1
             )
             edges_without_ring = cls.removeExternalRing(edges, 0.72)
+            # Empezamos con la extracción de datos
+            # Momentos de Hu
+            if EXTRACT_HU:
+                data_Hu = cls.huMoments(resized)
+                print(f"Hu Moments ->", end=" ")
+                for i in range(dp.N_HUMOMS):
+                    print(data_Hu[i], end=" ")
+                    data.update({f"HU_{i+1}": data_Hu[i]})
+                print()
             # Lectura de caracteres
-            data_ocr = cls.getOCR(equalized)
+            if EXTRACT_OCR:
+                data_ocr = cls.getOCR(equalized)
+                dp.appendOcrData(data_ocr, data)
             # Obtenemos info delas esquinas
-            data_keyP_wr = cls.keyPoints(reduced)  # WITH RING
-            # Obtenemos los momentos de Hu
-            data_Hu = cls.huMoments(resized)
+            if EXTRACT_KEYPWR:
+                data_keyP_wring = cls.keyPoints(reduced)  # WITH RING
+                print(
+                    f"KeyPs Center Info -> Dist ({round(data_keyP_wring[3],2)}) Angle ({round(data_keyP_wring[4],2)})"
+                )
+                data.update(
+                    {
+                        "CKP_N": data_keyP_wring[0],
+                        "CKP_X": data_keyP_wring[1],
+                        "CKP_Y": data_keyP_wring[2],
+                        "CKP_DIST": data_keyP_wring[3],
+                        "CKP_ANGLE": data_keyP_wring[4],
+                    }
+                )
+                # Obtenemos información de las líneas
+                if EXTRACT_LINES:
+                    # Normalizamos la orientación de la imagen de los bordes
+                    rotated = (
+                        cls.normalize_orientations(
+                            data_cog_gray[2], data_cog_gray[3], edges
+                        )
+                        if NORMALIZE_ORIENTATION
+                        else edges
+                    )
+                    lines = cls.getLines(rotated)
+                    data_lines = dp.getLinesData(lines, rotated.shape[0])
+                    # print(f"Lines Info -> {data_lines}")
+                    data.update(data_lines)
+
+            # Obtenemos centro de gravedad de la imagen en escala de grises
+            if EXTRACT_COG_GRAY:
+                data_cog_gray = cls.center_of_gravity_info(gray)
+                print(
+                    f"Gray COG Info -> Dist ({round(data_cog_gray[2],2)}) Angle ({round(data_cog_gray[3],2)})"
+                )
+                data.update(
+                    {
+                        "CGG_X": data_cog_gray[0],
+                        "CGG_Y": data_cog_gray[1],
+                        "CGG_DIST": data_cog_gray[2],
+                        "CGG_ANGLE": data_cog_gray[3],
+                    }
+                )
+
+            # Obtenemos centro de gravedad de los bordes de la imagen
+            if EXTRACT_COG_CANNY:
+                data_cog_canny = cls.center_of_gravity_info(edges)
+                print(
+                    f"Edges COG Info -> Dist ({round(data_cog_canny[2],2)}) Angle ({round(data_cog_canny[3],2)})"
+                )
+                data.update(
+                    {
+                        "CGC_X": data_cog_canny[0],
+                        "CGC_Y": data_cog_canny[1],
+                        "CGC_DIST": data_cog_canny[2],
+                        "CGC_ANGLE": data_cog_canny[3],
+                    }
+                )
+
+            # Angulo entre el cog de los bordes y el cog de los keypoints
+            if EXTRACT_COG_CANNY and EXTRACT_KEYPWR:
+                centers_coords = (
+                    data_cog_canny[0],
+                    data_cog_canny[1],
+                    data_keyP_wring[1],
+                    data_keyP_wring[2],
+                )
+                data_cgc_ckp = {
+                    "CGC_CKP_ANGLE1": abs(data_keyP_wring[4] - data_cog_canny[3]),
+                    "CGC_CKP_ANGLE2": dp.angle_func(centers_coords),
+                    "CGC_CKP_LONG": dp.len_func(centers_coords),
+                }
+                data.update(data_cgc_ckp)
+
+                print(f"CGC and CKP Info -> {data_cgc_ckp}")
+
             # Obtenemos la similitud con diferentes anillos
-            data_ring_similarities = cls.compareImgs(ring_edges_dilated, rings2compare)
-            # Calculamos centro de gravedad y orientamos imgaen
-            data_cog_gray = cls.center_of_gravity_info(gray)
+            if EXTRACT_RINGSIMS:
+                data_ring_similarities = cls.compareImgs(ring, rings2compare)
+                # print(data_ring_similarities)
+                data.update(data_ring_similarities)
 
-            data_cog_canny = cls.center_of_gravity_info(edges_without_ring)
-            rotated = cls.normalize_orientations(
-                data_cog_canny[2], data_cog_canny[3], edges
-            )
-            # Obtenemos información de las líneas
-            lines = cls.getLines(rotated)
-            data_lines = dp.getLinesData(lines, rotated.shape[0])
+            data["CLASS"] = class_id  # Tambien guardamos la id de la clase
 
-            # Guardamos los datos obtenidos en el diccionario
-            data.get("HU_1").append(data_Hu[0])
-            data.get("HU_2").append(data_Hu[1])
-            data.get("CGG_X").append(data_cog_gray[0])
-            data.get("CGG_Y").append(data_cog_gray[1])
-            data.get("CGG_DIST").append(data_cog_gray[2])
-            data.get("CGG_ANGLE").append(data_cog_gray[3])
-            data.get("CGC_X").append(data_cog_canny[0])
-            data.get("CGC_Y").append(data_cog_canny[1])
-            data.get("CGC_DIST").append(data_cog_canny[2])
-            data.get("CGC_ANGLE").append(data_cog_canny[3])
-            data.get("CKP_N").append(data_keyP_wr[0])
-            data.get("CKP_X").append(data_keyP_wr[1])
-            data.get("CKP_Y").append(data_keyP_wr[2])
-            data.get("CKP_DIST").append(data_keyP_wr[3])
-            data.get("CKP_ANGLE").append(data_keyP_wr[4])
-            data.get("CGC_CKP_ANGLE").append(abs(data_keyP_wr[4] - data_cog_canny[3]))
-            for k in data_lines:
-                data.get(k).append(data_lines[k])
-            for k in data_ring_similarities:
-                data.get(k).append(data_ring_similarities[k])
-
-            dp.appendOcrData(data_ocr, data)
-            data.get("CLASS").append(class_id)
+            for key in all_data:
+                if data.get(key) is not None:
+                    all_data[key].append(data[key])
+                else:
+                    all_data[key].append(None)
 
             if DEBUG:
                 plt.subplot(241)
@@ -294,7 +370,7 @@ class ImProcessing:
 
                 plt.show()
 
-        return data
+        return all_data
 
     @classmethod
     def cropCircle(cls, img: cv2.Mat, ncoins=1) -> list[cv2.Mat]:
@@ -506,7 +582,6 @@ class ImProcessing:
         cmy, cmx = ndi.center_of_mass(img)
 
         dist = np.sqrt((cx - cmx) ** 2 + (cy - cmy) ** 2) * dp.IM_SIZE_ADJ / h
-        print(f"Center Dist -> {dist}")
         angle = math.degrees(math.atan2(cy - cmy, cx - cmx)) % 360
 
         if DEBUG:
@@ -525,7 +600,7 @@ class ImProcessing:
         img1 = cv2.resize(img1, (512, 512))
 
         data = {}
-        print(f"Ring similarities ->", end=" ")
+        # print(f"Ring similarities ->", end=" ")
         for i, img2 in enumerate(img2_ls, start=1):
 
             data[f"RING_MSE_{i}"] = mse(img1, img2)
@@ -540,5 +615,4 @@ class ImProcessing:
             data[f"RING_MSSSIM_{i}"] = np.real(msssim(img1, img2))
             data[f"RING_VIF_{i}"] = vifp(img1, img2)
             # cls.quickShow(np.concatenate((img1, img2), axis=1))
-        print(data)
         return data

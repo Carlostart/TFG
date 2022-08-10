@@ -132,7 +132,7 @@ def addCoins(img_paths):
         # writeCSV(pd.DataFrame.from_dict(data))
         pd.DataFrame.from_dict(data).to_csv(dp.FILE_CSV)
         end_time = time.time()
-        print(f"TIME ELAPSED: {end_time-start_time}")
+        print(f"TIME ELAPSED: {round(end_time-start_time)}")
         # -- POR COMPLETAR --
 
     except cv2.error:  # Tratamos cuando no encuentra el archivo

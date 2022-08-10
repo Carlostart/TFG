@@ -29,7 +29,7 @@ HLINES_KERNEL_RATIO = 35
 OCR_MINRATE = 0.75
 OCR_N_READS = 4
 
-N_HUMOMS = 2
+N_HUMOMS = 7
 
 KP_MAXCORNERS = 1000
 KP_QUALITY = 0.1
@@ -79,7 +79,9 @@ def initData():
         "CKP_Y": [],
         "CKP_DIST": [],
         "CKP_ANGLE": [],
-        "CGC_CKP_ANGLE": [],
+        "CGC_CKP_ANGLE1": [],
+        "CGC_CKP_ANGLE2": [],
+        "CGC_CKP_LONG": [],
         "BEST_AVG_X": [],
         "BEST_AVG_Y": [],
         "BEST_AVG_LEN": [],
@@ -153,16 +155,18 @@ def appendOcrData(ocr_data, data):
         data[f"OCR_{ch}"] = count
 
 
+def len_func(x):
+    return np.sqrt((x[0] - x[2]) ** 2 + (x[1] - x[3]) ** 2)
+
+
+def angle_func(x):
+    angle = math.degrees(math.atan2(x[1] - x[3], x[0] - x[2])) % 360
+    return angle - 180 if angle > 180 else angle
+
+
 def getLinesData(lines: list, img_size: int):
     lines_data = {}
     if lines is not None:
-
-        def len_func(x):
-            return np.sqrt((x[0] - x[2]) ** 2 + (x[1] - x[3]) ** 2)
-
-        def angle_func(x):
-            angle = math.degrees(math.atan2(x[1] - x[3], x[0] - x[2])) % 360
-            return angle - 180 if angle > 180 else angle
 
         lines = lines * IM_SIZE_ADJ / img_size
         sorted_lines = np.array(sorted(lines, key=len_func, reverse=True))
