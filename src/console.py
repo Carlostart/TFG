@@ -145,7 +145,7 @@ def addCoins(img_paths):
 
 def writeCSV(data: pd.DataFrame):
     # Introduce los datos en file_csv
-    data.to_csv(dp.FILE_CSV)
+    data.to_csv(dp.FILE_CSV, index=False)
     # with open(dp.FILE_CSV, mode="w") as f:
     #     writer = csv.writer(f)
     #     # Atributos

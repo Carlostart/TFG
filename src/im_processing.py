@@ -22,15 +22,15 @@ from sewar.full_ref import (
     vifp,
 )
 
-EXTRACT_OCR = True
+EXTRACT_OCR = False
 EXTRACT_KEYPWR = True
+NORMALIZE_ORIENTATION = True
 EXTRACT_HU = True
-EXTRACT_RINGSIMS = True
+EXTRACT_RINGSIMS = False
 EXTRACT_COG_CANNY = True
 EXTRACT_COG_GRAY = True
 EXTRACT_LINES = True
-NORMALIZE_ORIENTATION = False
-DEBUG = False
+DEBUG = True
 
 
 class ImProcessing:
@@ -283,7 +283,7 @@ class ImProcessing:
                     # Normalizamos la orientación de la imagen de los bordes
                     rotated = (
                         cls.normalize_orientations(
-                            data_cog_gray[2], data_cog_gray[3], edges
+                            data_keyP_wring[2], data_keyP_wring[3], edges
                         )
                         if NORMALIZE_ORIENTATION
                         else edges
@@ -295,7 +295,14 @@ class ImProcessing:
 
             # Obtenemos centro de gravedad de la imagen en escala de grises
             if EXTRACT_COG_GRAY:
-                data_cog_gray = cls.center_of_gravity_info(gray)
+                rotated = (
+                    cls.normalize_orientations(
+                        data_keyP_wring[2], data_keyP_wring[3], gray
+                    )
+                    if NORMALIZE_ORIENTATION
+                    else gray
+                )
+                data_cog_gray = cls.center_of_gravity_info(rotated)
                 print(
                     f"Gray COG Info -> Dist ({round(data_cog_gray[2],2)}) Angle ({round(data_cog_gray[3],2)})"
                 )
@@ -307,10 +314,16 @@ class ImProcessing:
                         "CGG_ANGLE": data_cog_gray[3],
                     }
                 )
-
             # Obtenemos centro de gravedad de los bordes de la imagen
             if EXTRACT_COG_CANNY:
-                data_cog_canny = cls.center_of_gravity_info(edges)
+                rotated = (
+                    cls.normalize_orientations(
+                        data_keyP_wring[2], data_keyP_wring[3], edges
+                    )
+                    if NORMALIZE_ORIENTATION
+                    else edges
+                )
+                data_cog_canny = cls.center_of_gravity_info(rotated)
                 print(
                     f"Edges COG Info -> Dist ({round(data_cog_canny[2],2)}) Angle ({round(data_cog_canny[3],2)})"
                 )
