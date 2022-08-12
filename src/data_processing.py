@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 from difflib import SequenceMatcher as SM
 import numpy as np
+import json
 
 PROJECT_ROOT = Path(__file__).parents[1]
 
@@ -26,7 +27,7 @@ HCIRCLES_MINRAD = 127
 
 HLINES_KERNEL_RATIO = 35
 
-OCR_MINRATE = 0.75
+OCR_MINRATE = 0.65
 OCR_N_READS = 4
 
 N_HUMOMS = 7
@@ -41,12 +42,15 @@ MIN_CENTERS_DIST = 500
 
 SIFT_PERCENTAGE_FOR_GP = 0.7
 
-# with open(FILE_COIN_WORDS, "r") as f:
-#     COIN_WORDS = set(f.readlines())
+LETTER_BASED_OCR = False
 
-OCR_CHARS = [
-    chr(i) for i in [*range(ord("A"), ord("Z") + 1), *range(ord("0"), ord("9") + 1)]
-]
+if LETTER_BASED_OCR:
+    OCR_CHARS = [
+        chr(i) for i in [*range(ord("A"), ord("Z") + 1), *range(ord("0"), ord("9") + 1)]
+    ]
+else:
+    with open(FILE_COIN_WORDS, "r") as f:
+        COIN_WORDS = set(f.readlines())
 
 
 def getFilesInFolders(pths):
@@ -75,18 +79,34 @@ def initData():
         "CGG_Y": [],
         "CGG_DIST": [],
         "CGG_ANGLE": [],
+        "CGG_NR_X": [],
+        "CGG_NR_Y": [],
+        "CGG_NR_DIST": [],
+        "CGG_NR_ANGLE": [],
         "CGC_X": [],
         "CGC_Y": [],
         "CGC_DIST": [],
         "CGC_ANGLE": [],
+        "CGC_NR_X": [],
+        "CGC_NR_Y": [],
+        "CGC_NR_DIST": [],
+        "CGC_NR_ANGLE": [],
         "CKP_N": [],
         "CKP_X": [],
         "CKP_Y": [],
         "CKP_DIST": [],
         "CKP_ANGLE": [],
+        "CKP_NR_N": [],
+        "CKP_NR_X": [],
+        "CKP_NR_Y": [],
+        "CKP_NR_DIST": [],
+        "CKP_NR_ANGLE": [],
         "CGC_CKP_ANGLE1": [],
         "CGC_CKP_ANGLE2": [],
         "CGC_CKP_LONG": [],
+        "NR_CGC_CKP_ANGLE1": [],
+        "NR_CGC_CKP_ANGLE2": [],
+        "NR_CGC_CKP_LONG": [],
         "BEST_AVG_X": [],
         "BEST_AVG_Y": [],
         "BEST_AVG_LEN": [],
@@ -103,13 +123,19 @@ def initData():
         "LONGEST_Y": [],
         "LONGEST_LEN": [],
         "LONGEST_ANGLE": [],
+        "EDGES_COUNT": [],
+        "LIGHT_PIXELS_COUNT": [],
+        "EDGES_COUNT_NORING": [],
+        "LIGHT_PIXELS_COUNT_NORING": [],
     }
-    # for word in COIN_WORDS:
-    #     data.update({f"OCR_{word[:-1]}": []})
-    for letter in OCR_CHARS:
-        data.update({f"OCR_{letter}": []})
-    for number in range(10):
-        data.update({f"OCR_{number}": []})
+    if LETTER_BASED_OCR:
+        for letter in OCR_CHARS:
+            data.update({f"OCR_{letter}": []})
+        for number in range(10):
+            data.update({f"OCR_{number}": []})
+    else:
+        for word in COIN_WORDS:
+            data.update({f"OCR_{word[:-1]}": []})
 
     for i in range(1, len(RING_FILES) + 1):
         data.update({f"RING_MSE_{i}": []})
@@ -142,22 +168,21 @@ def getClass(pth):
     return class_id, ncoins
 
 
-# def appendOcrData(ocr_data, data):
-#     for word in COIN_WORDS:
-#         m = 0
-#         for ocr in ocr_data:
-#             aux = SM(None, word[:-1], ocr).ratio()
-#             m = max(m, aux)
-#         data.get(f"OCR_{word[:-1]}").append(m)
-
-
 def appendOcrData(ocr_data, data):
-    for ch in OCR_CHARS:
-        count = 0
-        for ocr in ocr_data:
-            if ch in ocr:
-                count += 1
-        data[f"OCR_{ch}"] = count
+    if LETTER_BASED_OCR:
+        for ch in OCR_CHARS:
+            count = 0
+            for ocr in ocr_data:
+                if ch in ocr:
+                    count += 1
+            data[f"OCR_{ch}"] = count
+    else:
+        for word in COIN_WORDS:
+            m = 0
+            for ocr in ocr_data:
+                aux = SM(None, word[:-1], ocr).ratio()
+                m = max(m, aux)
+            data[f"OCR_{word[:-1]}"] = m
 
 
 def len_func(x):
@@ -213,3 +238,11 @@ def getLinesData(lines: list, img_size: int):
         lines_data["LONGEST_Y"] = (longest[1] + longest[3]) / 2
 
     return lines_data
+
+
+def get_coin_info():
+    try:
+        with open(FILE_COIN_INFO, "r") as f:
+            return json.load(f)
+    except:
+        return {}

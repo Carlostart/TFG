@@ -6,6 +6,7 @@ import sys
 import os
 import time
 import pandas as pd
+import json
 
 import csv
 import cv2
@@ -79,7 +80,11 @@ def findCoins(img_paths):
             # Si se espacifica que hayan multiples monedas en la imagen
             _, nc = dp.getClass(pth)
             # Busca una moneda en la imaegn
-            findCoin(pth, nc)
+            info = findCoin(pth, nc)
+            if info:
+                print(f"La moneda en la imagen {pth} equivale a {info}")
+            else:
+                print(f"No se ha encontrado la moneda en la imágen {pth}")
         except cv2.error:  # Tratamos cuando no encuentra el archivo
             traceback.print_exc()
             print("Archivo no encontrado")
@@ -95,6 +100,19 @@ def findCoin(img, ncoins=1):
 
     # -- POR COMPLETAR --
     # Añadir identificacion por aprendizaje
+    coin_class = get_class(data)
+    info = dp.get_coin_info().get(coin_class, None)
+    print(
+        info
+        if info
+        else f"La clase es {coin_class}, pero no hay infomación de esta moneda"
+    )
+
+    return info
+
+
+def get_class(data):
+    return ("Test Name", "Test description", "www.test-url.com")
 
 
 def addCoins(img_paths):
@@ -129,7 +147,6 @@ def addCoins(img_paths):
 
         # Escribimos los datos en el archivo csv
         # print(data)
-        # writeCSV(pd.DataFrame.from_dict(data))
         pd.DataFrame.from_dict(data).to_csv(dp.FILE_CSV)
         end_time = time.time()
         print(f"TIME ELAPSED: {round(end_time-start_time)}")
@@ -143,28 +160,19 @@ def addCoins(img_paths):
         print("Error: Seguir formato -> add PATH_1,PATH_2,...PATH_N")
 
 
-def writeCSV(data: pd.DataFrame):
-    # Introduce los datos en file_csv
-    data.to_csv(dp.FILE_CSV, index=False)
-    # with open(dp.FILE_CSV, mode="w") as f:
-    #     writer = csv.writer(f)
-    #     # Atributos
-    #     writer.writerow(data.keys())
-    #     # Valores
-    #     r = [len(v) for v in data.values()]
-    #     writer.writerows(zip(*data.values()))
-
-
 def setInfo(args):
     if len(args) < 2:
-        print("Error: Seguir formato -> set-info CLASS {dict Info}")
+        print("Error: Seguir formato -> set-info CLASS NAME DESCRIPTION URL")
         return
 
     classId = args[0]
-    info = args[1]
+    info = {"NAME": args[1], "DESCRIPTION": args[2], "URL": args[3]}
 
-    with open(dp.FILE_COIN_INFO, "a") as f:
-        f.write(f"{classId}:{info}\n")
+    data = dp.get_coin_info()
+
+    with open(dp.FILE_COIN_INFO, "w") as f:
+        data.update({classId: info})
+        json.dump(data, f)
 
 
 def testData(img_paths):
@@ -211,7 +219,7 @@ def invalidCommand(_):
 def processCommand():
     # Procesador de Comandos
     # Obtenemos el comando
-    command = sys.argv[1:]
+    command, *args = sys.argv[1:]
     if command == []:  # Si no se escribe comando
         print("Comando necesario")
         return
@@ -225,7 +233,7 @@ def processCommand():
         "test-data": testData,
     }
     # Accionador del metodo asignado al comando ejecutado
-    select_action.get(command[0], invalidCommand)(command[1:])
+    select_action.get(command, invalidCommand)(args)
 
 
 if __name__ == "__main__":
