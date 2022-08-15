@@ -7,12 +7,12 @@ import json
 
 PROJECT_ROOT = Path(__file__).parents[1]
 
-FILE_PATHS = PROJECT_ROOT / "conf" / "path_to_data.txt"
+FILE_PATHS = PROJECT_ROOT / "conf" / "path_to_data.conf"
 FILE_CSV = PROJECT_ROOT / "data" / "DataSet.csv"
-FILE_COIN_INFO = PROJECT_ROOT / "conf" / "coin_info.txt"
-FILE_COIN_WORDS = PROJECT_ROOT / "conf" / "coin_words.txt"
+FILE_COIN_INFO = PROJECT_ROOT / "conf" / "coin_info.conf"
+FILE_COIN_WORDS = PROJECT_ROOT / "conf" / "coin_words.conf"
 OUT_FOLDER = PROJECT_ROOT / "data"
-RINGS_FOLDER = "conf/RINGS"
+RINGS_FOLDER = "data/conf/RINGS"
 
 IM_SIZE_ADJ = 512
 

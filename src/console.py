@@ -1,4 +1,5 @@
-from im_processing import ImProcessing
+from im_processing import *
+from im_classifier import extractData
 import data_processing as dp
 
 import traceback
@@ -92,7 +93,7 @@ def findCoins(img_paths):
 
 def findCoin(img, ncoins=1):
     # Extraemos datos de la moneda
-    data = ImProcessing.extractData(img, ncoins)
+    data = extractData(img, ncoins)
 
     # -- DEBUG --
     # Imprime los datos por pantalla
@@ -137,7 +138,7 @@ def addCoins(img_paths):
         for pth in img_paths:
             _, nc = dp.getClass(pth)
 
-            d = ImProcessing.extractData(pth, nc)
+            d = extractData(pth, nc)
 
             if data == None and d != None:
                 data = d
@@ -196,7 +197,7 @@ def testData(img_paths):
         image = cv2.imread(pth)
         # image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)  # Grayscale
         image = cv2.normalize(image, None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX)
-        cropped = ImProcessing.cropCircle(image, nc)
+        cropped = cropCircle(image, nc)
 
         img = pth.split("\\")[-1]
         img = img.split("/")[-1]
@@ -218,11 +219,11 @@ def invalidCommand(_):
 
 def processCommand():
     # Procesador de Comandos
-    # Obtenemos el comando
-    command, *args = sys.argv[1:]
-    if command == []:  # Si no se escribe comando
+    if len(sys.argv) < 2:  # Si no se escribe comando
         print("Comando necesario")
         return
+    # Obtenemos el comando
+    _, command, *args = sys.argv
 
     # Diccionario con los metodos de cada comando
     select_action = {
