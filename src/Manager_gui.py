@@ -1,10 +1,12 @@
+from cmath import exp
 from constants import messages as msg, colors
-from screens.Home import Home
+from windows.Info_Window import Info_Window
+from windows.Set_Info_Window import Set_Info_Window
 
-import os, subprocess
+
+import os, subprocess, random, threading, ast
 from PIL import Image, ImageTk
 import tkinter as tk
-from im_processing import cv2_to_imageTK
 from tkinter.filedialog import askopenfilenames, askdirectory
 
 
@@ -12,7 +14,7 @@ class Window(tk.Tk):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.title(msg.TITTLE)
-        self.geometry("610x610")
+        # self.geometry("610x610")
 
         self.init_widgets()
 
@@ -27,7 +29,9 @@ class Window(tk.Tk):
         self.browse_dir_text = tk.StringVar(self)
         self.browse_dir_text.set(msg.BROWSE_DIR)
 
-        tk.Label(self, text=msg.HEADER, **colors.STYLE).pack(side=tk.TOP, pady=8)
+        tk.Label(self, text=msg.HEADER, **colors.STYLE).pack(
+            side=tk.TOP, pady=8, padx=10
+        )
 
         browse_frame = tk.Frame(self)
         browse_frame.pack(side=tk.TOP, fill=tk.BOTH)
@@ -48,24 +52,34 @@ class Window(tk.Tk):
         ).pack(side=tk.RIGHT, padx=5)
 
         displayed_imgs_frame = tk.Frame(
-            self, width=600, height=400, background=colors.BACKGROUND
+            self, width=600, height=400, background=colors.BACKGROUND, padx=5, pady=5
         )
+
         tk.Button(
             self,
             text=msg.SHOW_IMGS,
             command=lambda: self.update_displayed_imgs(displayed_imgs_frame),
         ).pack(fill=tk.BOTH, padx=5)
-        displayed_imgs_frame.pack(side=tk.TOP, fill=tk.BOTH)
+        displayed_imgs_frame.pack(side=tk.TOP, fill=tk.BOTH, padx=5, pady=5)
 
         action_buttons_frame = tk.Frame(self)
         action_buttons_frame.pack(side=tk.BOTTOM, fill=tk.BOTH, expand=1)
+        for i in range(2):
+            action_buttons_frame.grid_columnconfigure(i, weight=1)
+            action_buttons_frame.grid_rowconfigure(i, weight=1)
 
         tk.Button(
             action_buttons_frame, text=msg.FIND_BTN, command=self.find_command
-        ).pack(side=tk.LEFT, fill=tk.BOTH, expand=1)
+        ).grid(row=0, column=0, sticky=tk.NSEW)
         tk.Button(
             action_buttons_frame, text=msg.ADD_BTN, command=self.add_command
-        ).pack(side=tk.RIGHT, fill=tk.BOTH, expand=1)
+        ).grid(row=0, column=1, sticky=tk.NSEW)
+        tk.Button(
+            action_buttons_frame, text=msg.TEST_BTN, command=self.test_command
+        ).grid(row=1, column=0, sticky=tk.NSEW)
+        tk.Button(
+            action_buttons_frame, text=msg.ADD_INFO_BTN, command=self.set_info_command
+        ).grid(row=1, column=1, sticky=tk.NSEW)
 
     def browse_filenames(self):
         self.browse_files_text.set(msg.BROWSING)
@@ -76,7 +90,9 @@ class Window(tk.Tk):
     def browse_folder(self):
         self.browse_dir_text.set(msg.BROWSING)
         dir = askdirectory(parent=self, title=msg.ASK_DIR)
-        self.paths = [os.path.join(dir, file) for file in os.listdir(dir)]
+        self.paths = (
+            [os.path.join(dir, file) for file in os.listdir(dir)] if dir else []
+        )
         self.browse_dir_text.set(msg.BROWSE_DIR)
         self.paths_preview.set(self.get_path_preview(self.paths))
 
@@ -91,9 +107,10 @@ class Window(tk.Tk):
 
     def update_displayed_imgs(self, frame):
         for wd in frame.winfo_children():
-            print(wd)
             wd.destroy()
-        for im_path, i in zip(self.paths, range(6)):
+        for im_path, i in zip(
+            random.sample(self.paths, min(6, len(self.paths))), range(6)
+        ):
             img_label = tk.Label(
                 frame, width=200, height=200, background=colors.BACKGROUND
             )
@@ -117,7 +134,29 @@ class Window(tk.Tk):
         for pth in self.paths:
             command += [pth]
 
-        subprocess.Popen(command)
+        pr = subprocess.Popen(
+            command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            universal_newlines=True,
+        )
+
+        def show_found():
+
+            while True:
+                line = pr.stdout.readline().replace("\n", "")
+                if not line:
+                    break
+                last = line
+                print(line)
+
+            result = ast.literal_eval(last)
+            for data in result:
+                window = Info_Window(self, data)
+                window.grab_set()
+
+        th = threading.Thread(target=show_found)
+        th.start()
 
     def add_command(self):
         command = ["python", "-u", "src/console.py", "add"]
@@ -125,3 +164,14 @@ class Window(tk.Tk):
             command += [pth]
 
         subprocess.Popen(command)
+
+    def test_command(self):
+        command = ["python", "-u", "src/console.py", "test-data"]
+        for pth in self.paths:
+            command += [pth]
+
+        subprocess.Popen(command)
+
+    def set_info_command(self):
+        window = Set_Info_Window(self)
+        window.grab_set()

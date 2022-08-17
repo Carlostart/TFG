@@ -4,8 +4,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import cv2
 
-EXTRACT_OCR = True
-EXTRACT_RINGSIMS = True
+EXTRACT_OCR = False
+EXTRACT_RINGSIMS = False
 
 NORMALIZE_ORIENTATION = True
 
@@ -15,7 +15,7 @@ EXTRACT_COG_GRAY = True
 EXTRACT_COG_CANNY = True
 EXTRACT_LINES = True
 ESTRACT_PIXELS_DATA = True
-DEBUG = True
+DEBUG = False
 
 
 def extractData(img_path: str, ncoins=1) -> dict[str, list]:
@@ -35,8 +35,6 @@ def extractData(img_path: str, ncoins=1) -> dict[str, list]:
     else:
         images = [img]
 
-    # Diccionario de listas de datos para exportar al archivo csv
-    all_data = dp.initData()
     # Obtenemos el nombre del archivo
     class_id, _ = dp.getClass(img_path)
     print(f"CLASS ID -> {class_id}")
@@ -198,12 +196,6 @@ def extractData(img_path: str, ncoins=1) -> dict[str, list]:
 
         data["CLASS"] = class_id  # Tambien guardamos la id de la clase
 
-        for key in all_data:
-            if data.get(key) is not None:
-                all_data[key].append(data[key])
-            else:
-                all_data[key].append(None)
-
         if DEBUG:
             plt.subplot(241)
             plt.title("Original")
@@ -215,4 +207,4 @@ def extractData(img_path: str, ncoins=1) -> dict[str, list]:
 
             plt.show()
 
-    return all_data
+    return data

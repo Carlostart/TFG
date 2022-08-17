@@ -240,9 +240,10 @@ def getLinesData(lines: list, img_size: int):
     return lines_data
 
 
-def get_coin_info():
+def get_coin_info(coin_class):
     try:
         with open(FILE_COIN_INFO, "r") as f:
-            return json.load(f)
+            all_classes = json.load(f)
+            return all_classes.get(coin_class)
     except:
         return {}

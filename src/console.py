@@ -1,3 +1,4 @@
+from genericpath import isdir
 from im_processing import *
 from im_classifier import extractData
 import data_processing as dp
@@ -75,6 +76,7 @@ def findCoins(img_paths):
             return
 
     img_paths = dp.getFilesInFolders(img_paths)
+    result = "["
     # Buscamos todas las monedas
     for pth in img_paths:
         try:
@@ -83,12 +85,20 @@ def findCoins(img_paths):
             # Busca una moneda en la imaegn
             info = findCoin(pth, nc)
             if info:
-                print(f"La moneda en la imagen {pth} equivale a {info}")
+                print(
+                    "La moneda en la imagen "
+                    + pth.split("/")[-1]
+                    + f" equivale a {info}"
+                )
+                result += str(info) + ", "
+
             else:
                 print(f"No se ha encontrado la moneda en la imágen {pth}")
+
         except cv2.error:  # Tratamos cuando no encuentra el archivo
             traceback.print_exc()
             print("Archivo no encontrado")
+    print(result + "]")
 
 
 def findCoin(img, ncoins=1):
@@ -102,18 +112,16 @@ def findCoin(img, ncoins=1):
     # -- POR COMPLETAR --
     # Añadir identificacion por aprendizaje
     coin_class = get_class(data)
-    info = dp.get_coin_info().get(coin_class, None)
-    print(
-        info
-        if info
-        else f"La clase es {coin_class}, pero no hay infomación de esta moneda"
-    )
+    info = dp.get_coin_info(coin_class)
+
+    if not info:
+        print(f"La clase es {coin_class}, pero no hay infomación de esta moneda")
 
     return info
 
 
 def get_class(data):
-    return ("Test Name", "Test description", "www.test-url.com")
+    return "TEST"
 
 
 def addCoins(img_paths):
@@ -134,17 +142,17 @@ def addCoins(img_paths):
 
         img_paths = dp.getFilesInFolders(img_paths)
         # Extraemos datos de todas la imagenes especificadas
-        data = None
+        data = dp.initData()
         for pth in img_paths:
             _, nc = dp.getClass(pth)
 
-            d = extractData(pth, nc)
+            im_data = extractData(pth, nc)
 
-            if data == None and d != None:
-                data = d
+        for key in data:
+            if im_data.get(key) is not None:
+                data[key].append(im_data[key])
             else:
-                for k in d:
-                    data[k] += d[k]
+                data[key].append(None)
 
         # Escribimos los datos en el archivo csv
         # print(data)
@@ -169,24 +177,24 @@ def setInfo(args):
     classId = args[0]
     info = {"NAME": args[1], "DESCRIPTION": args[2], "URL": args[3]}
 
-    data = dp.get_coin_info()
+    data = dp.get_coin_info(classId)
 
     with open(dp.FILE_COIN_INFO, "w") as f:
         data.update({classId: info})
         json.dump(data, f)
 
+    print(f"Añadida la información {info} a la clase {classId}")
+
 
 def testData(img_paths):
+
     if img_paths == []:
-        img_paths = readPaths()
-        # Si faltan argumentos los pedimos
-        if img_paths == []:
-            print(
-                "Comprueba el funcionamiento del algoritmo de estracción de datos:\n"
-                + "test-data PATH_1 PATH_2 ... PATH_N\n"
-                + "Se pueden seleccionar carpetas"
-            )
-            return
+        print(
+            "Comprueba el funcionamiento del algoritmo de estracción de datos:\n"
+            + "test-data PATH_1 PATH_2 ... PATH_N\n"
+            + "Se pueden seleccionar carpetas"
+        )
+        return
 
     img_paths = dp.getFilesInFolders(img_paths)
     for pth in img_paths:
@@ -194,21 +202,24 @@ def testData(img_paths):
         # Si hay multiples monedas en la imagen debe estar indicado con M
         _, nc = dp.getClass(pth)
 
-        image = cv2.imread(pth)
+        img_array = np.fromfile(pth, np.uint8)
+        image = cv2.imdecode(img_array, cv2.IMREAD_UNCHANGED)
         # image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)  # Grayscale
         image = cv2.normalize(image, None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX)
         cropped = cropCircle(image, nc)
 
         img = pth.split("\\")[-1]
         img = img.split("/")[-1]
-        pth = f"{pth[:-len(img)-1]}_CROPPED_TEST"
+        pth = f"{pth[:-len(img)-1]}_TESTED"
         if not os.path.exists(pth):
             os.makedirs(pth)
         img = img.split(".")
         for i, cr in enumerate(cropped):
-            print(f"{pth}/{img[0]}_{i}.{img[1]}")
-            cv2.imwrite(f"{pth}/{img[0]}_{i}.{img[1]}", cr)
-            # edges = ImProcessing.edgesInside(cr)
+            filename = f"{pth}/{img[0]}_{i}.{img[1]}"
+            print(filename)
+            is_success, im_buf_arr = cv2.imencode(".jpg", cr)
+            im_buf_arr.tofile(filename)
+
             # cv2.imwrite(
             #     f'{dp.OUT_FOLDER}/EDGES_{img[0]}_{i}.{img[1]}', cv2.resize(edges, (255, 255)))
 
