@@ -18,7 +18,7 @@ ESTRACT_PIXELS_DATA = True
 DEBUG = False
 
 
-def extractData(img_path: str, ncoins=1) -> dict[str, list]:
+def extractData(img_path: str, class_id, ncoins=1) -> dict[str, list]:
     print(
         "==========================================================\n"
         + f"Identificando imagen: {img_path}"
@@ -36,7 +36,6 @@ def extractData(img_path: str, ncoins=1) -> dict[str, list]:
         images = [img]
 
     # Obtenemos el nombre del archivo
-    class_id, _ = dp.getClass(img_path)
     print(f"CLASS ID -> {class_id}")
     # Si hay varias monedas en una misma imagen procesamos todas
     rings2compare = [

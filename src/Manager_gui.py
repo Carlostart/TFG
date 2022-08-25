@@ -71,9 +71,16 @@ class Window(tk.Tk):
         tk.Button(
             action_buttons_frame, text=msg.FIND_BTN, command=self.find_command
         ).grid(row=0, column=0, sticky=tk.NSEW)
+
+        add_frame = tk.Frame(action_buttons_frame)
+        add_frame.grid(row=0, column=1, sticky=tk.NSEW)
+        coin_class = tk.StringVar()
         tk.Button(
-            action_buttons_frame, text=msg.ADD_BTN, command=self.add_command
-        ).grid(row=0, column=1, sticky=tk.NSEW)
+            add_frame,
+            text=msg.ADD_BTN,
+            command=lambda: self.add_command(coin_class.get()),
+        ).pack(side=tk.LEFT, fill=tk.BOTH, expand=1)
+        tk.Entry(add_frame, textvariable=coin_class).pack(side=tk.RIGHT, fill=tk.BOTH)
         tk.Button(
             action_buttons_frame, text=msg.TEST_BTN, command=self.test_command
         ).grid(row=1, column=0, sticky=tk.NSEW)
@@ -134,6 +141,7 @@ class Window(tk.Tk):
         for pth in self.paths:
             command += [pth]
 
+        print(command)
         pr = subprocess.Popen(
             command,
             stdout=subprocess.PIPE,
@@ -158,11 +166,14 @@ class Window(tk.Tk):
         th = threading.Thread(target=show_found)
         th.start()
 
-    def add_command(self):
+    def add_command(self, class_id):
         command = ["python", "-u", "src/console.py", "add"]
         for pth in self.paths:
             command += [pth]
+        if class_id:
+            command += [class_id]
 
+        print(command)
         subprocess.Popen(command)
 
     def test_command(self):
@@ -170,6 +181,7 @@ class Window(tk.Tk):
         for pth in self.paths:
             command += [pth]
 
+        print(command)
         subprocess.Popen(command)
 
     def set_info_command(self):

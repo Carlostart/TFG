@@ -137,6 +137,11 @@ def addCoins(img_paths):
             )
             return
 
+    same_class = False
+    if not os.path.exists(img_paths[-1]):
+        same_class = True
+        class_id = img_paths.pop(-1)
+
     try:
         start_time = time.time()
 
@@ -144,15 +149,18 @@ def addCoins(img_paths):
         # Extraemos datos de todas la imagenes especificadas
         data = dp.initData()
         for pth in img_paths:
-            _, nc = dp.getClass(pth)
-
-            im_data = extractData(pth, nc)
-
-        for key in data:
-            if im_data.get(key) is not None:
-                data[key].append(im_data[key])
+            if same_class:
+                _, nc = dp.getClass(pth)
             else:
-                data[key].append(None)
+                class_id, nc = dp.getClass(pth)
+
+            im_data = extractData(pth, class_id, nc)
+
+            for key in data:
+                if im_data.get(key) is not None:
+                    data[key].append(im_data[key])
+                else:
+                    data[key].append(None)
 
         # Escribimos los datos en el archivo csv
         # print(data)
