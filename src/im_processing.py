@@ -31,27 +31,31 @@ def quickShow(img, title=""):
     plt.show()
 
 
-def removeExternalRing(img: cv2.Mat, pr) -> cv2.Mat:
+def reduceCircle(img: cv2.Mat, pr) -> cv2.Mat:
     height, width = img.shape[:2]
     # Ahora eliminamos el anillo exterior de la moneda
     mask = np.zeros((height, width), np.uint8)
+    x, y, r = int(height / 2), int(width / 2), int((height / 2) * pr)
+
     cv2.circle(
         mask,
-        (int(height / 2), int(width / 2)),
-        int((height / 2) * pr),
+        (x, y),
+        r,
         255,
         thickness=-1,
     )
-    return cv2.bitwise_and(img, img, mask=mask)
+    masked = cv2.bitwise_and(img, img, mask=mask)
+    return masked[y - r : y + r, x - r : x + r]
 
 
 def getOuterRing(img: cv2.Mat, pr) -> cv2.Mat:
     height, width = img.shape[:2]
     mask = np.ones((height, width), np.uint8)
+    x, y, r = int(height / 2), int(width / 2), int((height / 2) * pr)
     cv2.circle(
         mask,
-        (int(height / 2), int(width / 2)),
-        int((height / 2) * pr),
+        (x, y),
+        r,
         0,
         thickness=-1,
     )
@@ -101,6 +105,18 @@ def edgesInside(img):
     edges = cv2.Canny(aux, dp.CANNY_TRHES1, dp.CANNY_TRHES2)
 
     return edges
+
+
+def edgesSobel(gray_img):
+
+    ksize = -1
+    gX = cv2.Sobel(gray_img, ddepth=cv2.CV_32F, dx=1, dy=0, ksize=ksize)
+    gY = cv2.Sobel(gray_img, ddepth=cv2.CV_32F, dx=0, dy=1, ksize=ksize)
+    # on them and visualize them
+    gX = cv2.convertScaleAbs(gX)
+    gY = cv2.convertScaleAbs(gY)
+    # combine the gradient representations into a single image
+    return cv2.addWeighted(gX, 0.5, gY, 0.5, 0)
 
 
 # https://gist.github.com/HViktorTsoi/8e8b0468a9fb07842669aa368382a7df
@@ -196,23 +212,19 @@ def correction(
     return output
 
 
-def cropCircle(img: cv2.Mat, ncoins=1, DEBUG=False) -> list[cv2.Mat]:
-
-    # Si el fondo es blanco hacemos correcion de sombras
-    _, threshold = cv2.threshold(img, 127, 255, cv2.THRESH_BINARY)
+def cropCircles(img: cv2.Mat, ncoins=1, DEBUG=False) -> list[cv2.Mat]:
 
     height, width = img.shape[:2]
     # Aplicamos un suavizado para eliminar ruidos
     blurred = gaussBlur(img)
+    # Pasamos a escala de grises
+    gray = cv2.cvtColor(blurred, cv2.COLOR_BGR2GRAY)
+    # Aplicamos detección de bordes con Sobel
+    edges_sobel = edgesSobel(gray)
+    # Aplicamos morfologia de cierre para definir mejor la siueta de la moneda
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (71, 71))
+    morphed = cv2.morphologyEx(edges_sobel, cv2.MORPH_CLOSE, kernel, iterations=1)
 
-    _, threshold = cv2.threshold(blurred, 127, 255, cv2.THRESH_BINARY)
-    threshold = cv2.cvtColor(threshold, cv2.COLOR_BGR2GRAY)
-
-    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (51, 51))
-    morphed = cv2.morphologyEx(threshold, cv2.MORPH_CLOSE, kernel, iterations=1)
-    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (51, 51))
-    morphed = cv2.morphologyEx(morphed, cv2.MORPH_OPEN, kernel, iterations=1)
-    # -------------
     #   Obtenemos los circulos
     cdp = int(height / 255)
     circles = cv2.HoughCircles(
@@ -227,14 +239,11 @@ def cropCircle(img: cv2.Mat, ncoins=1, DEBUG=False) -> list[cv2.Mat]:
     )
 
     # Obtenemos la mediana de los radios
-
-    rcoin = circles[0, 0, 2]
-    print(f"Coin radius (px) -> {rcoin}")
+    best_radious = circles[0, 0, 2]
+    print(f"Coin radius (px) -> {best_radious}")
 
     cropped_ls = []
-    # Pasamos a escala BGR para pocer marcar la imagen con colores
-    if DEBUG:
-        show = cv2.cvtColor(morphed.copy(), cv2.COLOR_GRAY2BGR)
+
     # Por cada circulo:
     deleted = 0
     for idx, i in enumerate(circles[0, :]):
@@ -246,7 +255,7 @@ def cropCircle(img: cv2.Mat, ncoins=1, DEBUG=False) -> list[cv2.Mat]:
         r = min(x, y, width - x, height - y, r)
 
         # Borra circulos de tamaño desproporcionado
-        if r > rcoin * 1.2 or r < rcoin * 0.8:
+        if r > best_radious * 1.2 or r < best_radious * 0.8:
             print(f"Bad circle: x={x} y={y} r={r}")
             miss = True
             deleted += 1
@@ -264,23 +273,23 @@ def cropCircle(img: cv2.Mat, ncoins=1, DEBUG=False) -> list[cv2.Mat]:
         # -- DEBUG} --
         #  Dibujamos los circulos seleccionados
         if DEBUG:
+            # Pasamos a escala BGR para pocer marcar la imagen con colores
+            show = cv2.cvtColor(morphed.copy(), cv2.COLOR_GRAY2BGR)
             cv2.circle(show, (x, y), r, (255, 0, 0), thickness=10)
+            plt.subplot(243)
+            plt.title("Circles")
+            plt.imshow(show)
         #  ------------
         # Nos salimos del bucle cuando hemos seleccionado el numero de monedas especificado
-        if idx >= ncoins - 1 and (deleted > 3 or not miss):
+        if idx >= ncoins - 1 and (deleted >= 3 or not miss):
             break
     # Muestra cuantos circulos se han encontrado
     print(f"Extracted {ncoins} circles")
 
-    if DEBUG:
-        plt.subplot(243)
-        plt.title("Circles")
-        plt.imshow(show)
-
     return cropped_ls
 
 
-def getOCR(img: cv2.Mat, DEBUG=False) -> list[str]:
+def getOCR(img: cv2.Mat, DEBUG=False, n_reads=1) -> list[str]:
     h, w = img.shape[:2]
     # Creamos el reader
     reader = easyocr.Reader(["en"])

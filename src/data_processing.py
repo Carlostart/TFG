@@ -15,6 +15,7 @@ OUT_FOLDER = PROJECT_ROOT / "data"
 RINGS_FOLDER = "data/conf/RINGS"
 
 IM_SIZE_ADJ = 512
+RING_SIZE = 0.75
 
 CANNY_TRHES1 = 50
 CANNY_TRHES2 = 100
@@ -27,7 +28,7 @@ HCIRCLES_MINRAD = 127
 
 HLINES_KERNEL_RATIO = 35
 
-OCR_MINRATE = 0.65
+OCR_MINRATE = 0.8
 OCR_N_READS = 4
 
 N_HUMOMS = 7
@@ -91,6 +92,10 @@ def initData():
         "CGC_NR_Y": [],
         "CGC_NR_DIST": [],
         "CGC_NR_ANGLE": [],
+        "CGC_R_X": [],
+        "CGC_R_Y": [],
+        "CGC_R_DIST": [],
+        "CGC_R_ANGLE": [],
         "CKP_N": [],
         "CKP_X": [],
         "CKP_Y": [],
@@ -123,10 +128,10 @@ def initData():
         "LONGEST_Y": [],
         "LONGEST_LEN": [],
         "LONGEST_ANGLE": [],
-        "EDGES_COUNT": [],
-        "LIGHT_PIXELS_COUNT": [],
-        "EDGES_COUNT_NORING": [],
-        "LIGHT_PIXELS_COUNT_NORING": [],
+        "CANNY_PX_COUNT_R": [],
+        "SOBEL_PX_COUNT_R": [],
+        "CANNY_PX_COUNT_NR": [],
+        "SOBEL_PX_COUNT_NR": [],
     }
     if LETTER_BASED_OCR:
         for letter in OCR_CHARS:

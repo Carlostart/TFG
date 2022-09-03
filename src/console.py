@@ -1,4 +1,3 @@
-from genericpath import isdir
 from im_processing import *
 from im_classifier import extractData
 import data_processing as dp
@@ -10,7 +9,6 @@ import time
 import pandas as pd
 import json
 
-import csv
 import cv2
 
 
@@ -214,7 +212,7 @@ def testData(img_paths):
         image = cv2.imdecode(img_array, cv2.IMREAD_UNCHANGED)
         # image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)  # Grayscale
         image = cv2.normalize(image, None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX)
-        cropped = cropCircle(image, nc)
+        cropped = cropCircles(image, nc)
 
         img = pth.split("\\")[-1]
         img = img.split("/")[-1]

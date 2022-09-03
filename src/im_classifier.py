@@ -7,7 +7,7 @@ import cv2
 EXTRACT_OCR = False
 EXTRACT_RINGSIMS = False
 
-NORMALIZE_ORIENTATION = True
+NORMALIZE_ORIENTATION = False
 
 EXTRACT_HU = True
 EXTRACT_KEYPWR = True
@@ -15,7 +15,7 @@ EXTRACT_COG_GRAY = True
 EXTRACT_COG_CANNY = True
 EXTRACT_LINES = True
 ESTRACT_PIXELS_DATA = True
-DEBUG = False
+DEBUG = True
 
 
 def extractData(img_path: str, class_id, ncoins=1) -> dict[str, list]:
@@ -31,7 +31,7 @@ def extractData(img_path: str, class_id, ncoins=1) -> dict[str, list]:
         # img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)  # Grayscale
         img = cv2.normalize(img, None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX)
         # Separa y recorta cada moneda
-        images = ip.cropCircle(img, ncoins, DEBUG)
+        images = ip.cropCircles(img, ncoins, DEBUG)
     else:
         images = [img]
 
@@ -44,21 +44,27 @@ def extractData(img_path: str, class_id, ncoins=1) -> dict[str, list]:
     for image in images:
         data = {}
         # Aplicamos CLAHE y eliminamos el borde exterior de la moneda
-        equalized = ip.clahe(image)
-        reduced = ip.removeExternalRing(image, 0.9)
-        img_without_ring = ip.removeExternalRing(image, 0.72)
+        image = ip.clahe(image)
+        reduced = ip.reduceCircle(image, 0.9)
+        ring = ip.getOuterRing(reduced, dp.RING_SIZE)
+        img_without_ring = ip.reduceCircle(reduced, dp.RING_SIZE)
+
         # Procesamos la imagen ajustando el tamaño, haciendo escala de grises y calculando bordes
         resized = cv2.resize(reduced, (dp.IM_SIZE_ADJ, dp.IM_SIZE_ADJ))
         gray = cv2.cvtColor(resized, cv2.COLOR_BGR2GRAY)
-        gray_without_ring = ip.removeExternalRing(gray, 0.72)
+        gray_ring = cv2.cvtColor(ring, cv2.COLOR_BGR2GRAY)
+        gray_without_ring = ip.reduceCircle(gray, dp.RING_SIZE)
 
         edges = ip.edgesInside(reduced)
+        sobel_edges = ip.edgesSobel(reduced)
+        sobel_edges_nr = ip.reduceCircle(gray, dp.RING_SIZE)
+        sobel_edges_ring = ip.getOuterRing(reduced, dp.RING_SIZE)
+
         # Separamos el anillo de la moneda en diferentes formatos
-        ring = ip.getOuterRing(reduced, 0.72)
-        ring_edges = ip.getOuterRing(edges, 0.72)
+        ring_edges = ip.getOuterRing(edges, dp.RING_SIZE)
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
         dilated_edges = cv2.morphologyEx(edges, cv2.MORPH_DILATE, kernel, iterations=1)
-        edges_without_ring = ip.removeExternalRing(edges, 0.72)
+        edges_without_ring = ip.reduceCircle(edges, dp.RING_SIZE)
         # Empezamos con la extracción de datos
         # Momentos de Hu
         if EXTRACT_HU:
@@ -70,22 +76,22 @@ def extractData(img_path: str, class_id, ncoins=1) -> dict[str, list]:
             print()
         # Lectura de caracteres
         if EXTRACT_OCR:
-            data_ocr = ip.getOCR(equalized, DEBUG)
+            data_ocr = ip.getOCR(image, DEBUG)
             dp.appendOcrData(data_ocr, data)
         # Obtenemos info delas esquinas
         if EXTRACT_KEYPWR:
-            data_keyP = ip.keyPoints(reduced, DEBUG)  # WITH RING
+            data_keyP_r = ip.keyPoints(ring, DEBUG)  # WITH RING
             data_keyP_nr = ip.keyPoints(img_without_ring)  # WITH RING
             print(
-                f"KeyPs Center Info -> Dist ({round(data_keyP[3],2)}) Angle ({round(data_keyP[4],2)})"
+                f"KeyPs Center Info -> Dist ({round(data_keyP_nr[3],2)}) Angle ({round(data_keyP_r[4],2)})"
             )
             data.update(
                 {
-                    "CKP_N": data_keyP[0],
-                    "CKP_X": data_keyP[1],
-                    "CKP_Y": data_keyP[2],
-                    "CKP_DIST": data_keyP[3],
-                    "CKP_ANGLE": data_keyP[4],
+                    "CKP_R_N": data_keyP_r[0],
+                    "CKP_R_X": data_keyP_r[1],
+                    "CKP_R_Y": data_keyP_r[2],
+                    "CKP_R_DIST": data_keyP_r[3],
+                    "CKP_R_ANGLE": data_keyP_r[4],
                     "CKP_NR_N": data_keyP_nr[0],
                     "CKP_NR_X": data_keyP_nr[1],
                     "CKP_NR_Y": data_keyP_nr[2],
@@ -97,13 +103,13 @@ def extractData(img_path: str, class_id, ncoins=1) -> dict[str, list]:
             # Normalizamos la orientación de las imagenes que usaremos
             if NORMALIZE_ORIENTATION:
                 edges_without_ring = ip.normalize_orientation(
-                    data_keyP[2], data_keyP[3], edges_without_ring
+                    data_keyP_r[2], data_keyP_r[3], edges_without_ring
                 )
                 gray_without_ring = ip.normalize_orientation(
-                    data_keyP[2], data_keyP[3], gray_without_ring
+                    data_keyP_r[2], data_keyP_r[3], gray_without_ring
                 )
-                gray = ip.normalize_orientation(data_keyP[2], data_keyP[3], gray)
-                edges = ip.normalize_orientation(data_keyP[2], data_keyP[3], edges)
+                gray = ip.normalize_orientation(data_keyP_r[2], data_keyP_r[3], gray)
+                edges = ip.normalize_orientation(data_keyP_r[2], data_keyP_r[3], edges)
 
         # Obtenemos información de las líneas
         if EXTRACT_LINES:
@@ -114,17 +120,17 @@ def extractData(img_path: str, class_id, ncoins=1) -> dict[str, list]:
 
         # Obtenemos centro de gravedad de la imagen en escala de grises
         if EXTRACT_COG_GRAY:
-            data_cog_gray = ip.center_of_gravity_info(gray, DEBUG)
+            data_cog_gray_r = ip.center_of_gravity_info(gray_ring, DEBUG)
             data_cog_gray_nr = ip.center_of_gravity_info(gray_without_ring)
             print(
-                f"Gray COG Info -> Dist ({round(data_cog_gray[2],2)}) Angle ({round(data_cog_gray[3],2)})"
+                f"Gray COG Info -> Dist ({round(data_cog_gray_r[2],2)}) Angle ({round(data_cog_gray_r[3],2)})"
             )
             data.update(
                 {
-                    "CGG_X": data_cog_gray[0],
-                    "CGG_Y": data_cog_gray[1],
-                    "CGG_DIST": data_cog_gray[2],
-                    "CGG_ANGLE": data_cog_gray[3],
+                    "CGG_R_X": data_cog_gray_r[0],
+                    "CGG_R_Y": data_cog_gray_r[1],
+                    "CGG_R_DIST": data_cog_gray_r[2],
+                    "CGG_R_ANGLE": data_cog_gray_r[3],
                     "CGG_NR_X": data_cog_gray_nr[0],
                     "CGG_NR_Y": data_cog_gray_nr[1],
                     "CGG_NR_DIST": data_cog_gray_nr[2],
@@ -135,6 +141,7 @@ def extractData(img_path: str, class_id, ncoins=1) -> dict[str, list]:
         if EXTRACT_COG_CANNY:
             data_cog_canny = ip.center_of_gravity_info(edges)
             data_cog_canny_nr = ip.center_of_gravity_info(edges_without_ring)
+            data_cog_canny_r = ip.center_of_gravity_info(ring_edges)
             print(
                 f"Edges COG Info -> Dist ({round(data_cog_canny[2],2)}) Angle ({round(data_cog_canny[3],2)})"
             )
@@ -148,16 +155,20 @@ def extractData(img_path: str, class_id, ncoins=1) -> dict[str, list]:
                     "CGC_NR_Y": data_cog_canny_nr[1],
                     "CGC_NR_DIST": data_cog_canny_nr[2],
                     "CGC_NR_ANGLE": data_cog_canny_nr[3],
+                    "CGC_R_X": data_cog_canny_r[0],
+                    "CGC_R_Y": data_cog_canny_r[1],
+                    "CGC_R_DIST": data_cog_canny_r[2],
+                    "CGC_R_ANGLE": data_cog_canny_r[3],
                 }
             )
 
         # Angulo entre el cog de los bordes y el cog de los keypoints
         if EXTRACT_COG_CANNY and EXTRACT_KEYPWR:
             centers_coords = (
-                data_cog_canny[0],
-                data_cog_canny[1],
-                data_keyP[1],
-                data_keyP[2],
+                data_cog_canny_r[0],
+                data_cog_canny_r[1],
+                data_keyP_r[1],
+                data_keyP_r[2],
             )
             centers_coords_nr = (
                 data_cog_canny_nr[0],
@@ -166,7 +177,7 @@ def extractData(img_path: str, class_id, ncoins=1) -> dict[str, list]:
                 data_keyP_nr[2],
             )
             data_cgc_ckp = {
-                "CGC_CKP_ANGLE1": abs(data_keyP[4] - data_cog_canny[3]),
+                "CGC_CKP_ANGLE1": abs(data_keyP_r[4] - data_cog_canny_r[3]),
                 "CGC_CKP_ANGLE2": dp.angle_func(centers_coords),
                 "CGC_CKP_LONG": dp.len_func(centers_coords),
                 "NR_CGC_CKP_ANGLE1": abs(data_keyP_nr[4] - data_cog_canny_nr[3]),
@@ -186,10 +197,10 @@ def extractData(img_path: str, class_id, ncoins=1) -> dict[str, list]:
         if ESTRACT_PIXELS_DATA:
             data.update(
                 {
-                    "EDGES_COUNT": np.sum(edges == 255),
-                    "LIGHT_PIXELS_COUNT": np.sum(gray > 150),
-                    "EDGES_COUNT_NORING": np.sum(edges_without_ring == 255),
-                    "LIGHT_PIXELS_COUNT_NORING": np.sum(gray_without_ring > 150),
+                    "CANNY_PX_COUNT_R": np.sum(ring_edges == 255),
+                    "SOBEL_PX_COUNT_R": np.sum(sobel_edges_ring) / 255,
+                    "CANNY_PX_COUNT_NR": np.sum(edges_without_ring == 255),
+                    "SOBEL_PX_COUNT_NR": np.sum(sobel_edges_nr) / 255,
                 }
             )
 
@@ -203,6 +214,14 @@ def extractData(img_path: str, class_id, ncoins=1) -> dict[str, list]:
             plt.subplot(242)
             plt.title("Cropped")
             plt.imshow(image)
+
+            plt.subplot(243)
+            plt.title("Edges")
+            plt.imshow(img_without_ring, "gray")
+
+            plt.subplot(247)
+            plt.title("Edges")
+            plt.imshow(edges, "gray")
 
             plt.show()
 
