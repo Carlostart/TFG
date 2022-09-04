@@ -1,3 +1,4 @@
+from importlib.metadata import files
 import math
 import os
 from pathlib import Path
@@ -55,13 +56,14 @@ else:
 
 
 def getFilesInFolders(pths):
+    files_inside = []
     for pth in pths:
         if os.path.isdir(pth):
-            pths.remove(pth)
             # Introducimos todos los ficheros de la carpeta junto con su path a la lists
-            pths += [os.path.join(pth, file) for file in os.listdir(pth)]
-
-    return pths
+            files_inside += [os.path.join(pth, file) for file in os.listdir(pth)]
+        else:
+            files_inside.append(pth)
+    return files_inside
 
 
 RING_FILES = getFilesInFolders([RINGS_FOLDER])
@@ -76,18 +78,18 @@ def initData():
         "HU_5": [],
         "HU_6": [],
         "HU_7": [],
-        "CGG_X": [],
-        "CGG_Y": [],
-        "CGG_DIST": [],
-        "CGG_ANGLE": [],
+        "CGG_R_X": [],
+        "CGG_R_Y": [],
+        "CGG_R_DIST": [],
+        "CGG_R_ANGLE": [],
         "CGG_NR_X": [],
         "CGG_NR_Y": [],
         "CGG_NR_DIST": [],
         "CGG_NR_ANGLE": [],
-        "CGC_X": [],
-        "CGC_Y": [],
-        "CGC_DIST": [],
-        "CGC_ANGLE": [],
+        # "CGC_X": [],
+        # "CGC_Y": [],
+        # "CGC_DIST": [],
+        # "CGC_ANGLE": [],
         "CGC_NR_X": [],
         "CGC_NR_Y": [],
         "CGC_NR_DIST": [],
@@ -96,11 +98,11 @@ def initData():
         "CGC_R_Y": [],
         "CGC_R_DIST": [],
         "CGC_R_ANGLE": [],
-        "CKP_N": [],
-        "CKP_X": [],
-        "CKP_Y": [],
-        "CKP_DIST": [],
-        "CKP_ANGLE": [],
+        "CKP_R_N": [],
+        "CKP_R_X": [],
+        "CKP_R_Y": [],
+        "CKP_R_DIST": [],
+        "CKP_R_ANGLE": [],
         "CKP_NR_N": [],
         "CKP_NR_X": [],
         "CKP_NR_Y": [],

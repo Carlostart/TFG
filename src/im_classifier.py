@@ -4,8 +4,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import cv2
 
-EXTRACT_OCR = False
-EXTRACT_RINGSIMS = False
+EXTRACT_OCR = True
+EXTRACT_RINGSIMS = True
 
 NORMALIZE_ORIENTATION = False
 
@@ -15,7 +15,7 @@ EXTRACT_COG_GRAY = True
 EXTRACT_COG_CANNY = True
 EXTRACT_LINES = True
 ESTRACT_PIXELS_DATA = True
-DEBUG = True
+DEBUG = False
 
 
 def extractData(img_path: str, class_id, ncoins=1) -> dict[str, list]:
@@ -139,18 +139,18 @@ def extractData(img_path: str, class_id, ncoins=1) -> dict[str, list]:
             )
         # Obtenemos centro de gravedad de los bordes de la imagen
         if EXTRACT_COG_CANNY:
-            data_cog_canny = ip.center_of_gravity_info(edges)
+            # data_cog_canny = ip.center_of_gravity_info(edges)
             data_cog_canny_nr = ip.center_of_gravity_info(edges_without_ring)
             data_cog_canny_r = ip.center_of_gravity_info(ring_edges)
             print(
-                f"Edges COG Info -> Dist ({round(data_cog_canny[2],2)}) Angle ({round(data_cog_canny[3],2)})"
+                f"Edges COG Info -> Dist ({round(data_cog_canny_r[2],2)}) Angle ({round(data_cog_canny_r[3],2)})"
             )
             data.update(
                 {
-                    "CGC_X": data_cog_canny[0],
-                    "CGC_Y": data_cog_canny[1],
-                    "CGC_DIST": data_cog_canny[2],
-                    "CGC_ANGLE": data_cog_canny[3],
+                    # "CGC_X": data_cog_canny[0],
+                    # "CGC_Y": data_cog_canny[1],
+                    # "CGC_DIST": data_cog_canny[2],
+                    # "CGC_ANGLE": data_cog_canny[3],
                     "CGC_NR_X": data_cog_canny_nr[0],
                     "CGC_NR_Y": data_cog_canny_nr[1],
                     "CGC_NR_DIST": data_cog_canny_nr[2],
