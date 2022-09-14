@@ -3,22 +3,23 @@ import im_processing as ip
 import matplotlib.pyplot as plt
 import numpy as np
 import cv2
+from config_params import *
 
-EXTRACT_OCR = True
-EXTRACT_RINGSIMS = True
+# EXTRACT_OCR = True
+# EXTRACT_RINGSIMS = True
 
-NORMALIZE_ORIENTATION = False
+# NORMALIZE_ORIENTATION = False
 
-EXTRACT_HU = True
-EXTRACT_KEYPWR = True
-EXTRACT_COG_GRAY = True
-EXTRACT_COG_CANNY = True
-EXTRACT_LINES = True
-ESTRACT_PIXELS_DATA = True
-DEBUG = False
+# EXTRACT_HU = True
+# EXTRACT_KEYPWR = True
+# EXTRACT_COG_GRAY = True
+# EXTRACT_COG_CANNY = True
+# EXTRACT_LINES = True
+# ESTRACT_PIXELS_DATA = True
+# DEBUG = False
 
 
-def extractData(img_path: str, class_id, ncoins=1) -> dict[str, list]:
+def extractData(img_path: str, ncoins=1) -> dict[str, list]:
     print(
         "==========================================================\n"
         + f"Identificando imagen: {img_path}"
@@ -35,42 +36,38 @@ def extractData(img_path: str, class_id, ncoins=1) -> dict[str, list]:
     else:
         images = [img]
 
-    # Obtenemos el nombre del archivo
-    print(f"CLASS ID -> {class_id}")
     # Si hay varias monedas en una misma imagen procesamos todas
-    rings2compare = [
-        cv2.imread(ring) for ring in dp.getFilesInFolders([dp.RINGS_FOLDER])
-    ]
+    rings2compare = [cv2.imread(ring) for ring in dp.getFilesInFolders([RINGS_FOLDER])]
     for image in images:
         data = {}
         # Aplicamos CLAHE y eliminamos el borde exterior de la moneda
         image = ip.clahe(image)
         reduced = ip.reduceCircle(image, 0.9)
-        ring = ip.getOuterRing(reduced, dp.RING_SIZE)
-        img_without_ring = ip.reduceCircle(reduced, dp.RING_SIZE)
+        ring = ip.getOuterRing(reduced, RING_SIZE)
+        img_without_ring = ip.reduceCircle(reduced, RING_SIZE)
 
         # Procesamos la imagen ajustando el tamaño, haciendo escala de grises y calculando bordes
-        resized = cv2.resize(reduced, (dp.IM_SIZE_ADJ, dp.IM_SIZE_ADJ))
+        resized = cv2.resize(reduced, (IM_SIZE_ADJ, IM_SIZE_ADJ))
         gray = cv2.cvtColor(resized, cv2.COLOR_BGR2GRAY)
         gray_ring = cv2.cvtColor(ring, cv2.COLOR_BGR2GRAY)
-        gray_without_ring = ip.reduceCircle(gray, dp.RING_SIZE)
+        gray_without_ring = ip.reduceCircle(gray, RING_SIZE)
 
         edges = ip.edgesInside(reduced)
         sobel_edges = ip.edgesSobel(reduced)
-        sobel_edges_nr = ip.reduceCircle(gray, dp.RING_SIZE)
-        sobel_edges_ring = ip.getOuterRing(reduced, dp.RING_SIZE)
+        sobel_edges_nr = ip.reduceCircle(gray, RING_SIZE)
+        sobel_edges_ring = ip.getOuterRing(reduced, RING_SIZE)
 
         # Separamos el anillo de la moneda en diferentes formatos
-        ring_edges = ip.getOuterRing(edges, dp.RING_SIZE)
+        ring_edges = ip.getOuterRing(edges, RING_SIZE)
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
         dilated_edges = cv2.morphologyEx(edges, cv2.MORPH_DILATE, kernel, iterations=1)
-        edges_without_ring = ip.reduceCircle(edges, dp.RING_SIZE)
+        edges_without_ring = ip.reduceCircle(edges, RING_SIZE)
         # Empezamos con la extracción de datos
         # Momentos de Hu
         if EXTRACT_HU:
             data_Hu = ip.huMoments(resized)
             print(f"Hu Moments ->", end=" ")
-            for i in range(dp.N_HUMOMS):
+            for i in range(N_HUMOMS):
                 print(data_Hu[i], end=" ")
                 data.update({f"HU_{i+1}": data_Hu[i]})
             print()
@@ -203,8 +200,6 @@ def extractData(img_path: str, class_id, ncoins=1) -> dict[str, list]:
                     "SOBEL_PX_COUNT_NR": np.sum(sobel_edges_nr) / 255,
                 }
             )
-
-        data["CLASS"] = class_id  # Tambien guardamos la id de la clase
 
         if DEBUG:
             plt.subplot(241)

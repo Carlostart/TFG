@@ -1,4 +1,5 @@
 import data_processing as dp
+from config_params import *
 
 import scipy.ndimage as ndi
 import math
@@ -79,7 +80,7 @@ def clahe(img: cv2.Mat) -> cv2.Mat:
 def gaussBlur(img):
     h, _ = img.shape[:2]
     # Aplicamos un suavizado para eliminar ruidos
-    ksize = int(h / dp.HLINES_KERNEL_RATIO)
+    ksize = int(h / HLINES_KERNEL_RATIO)
     fm = cv2.Laplacian(img, cv2.CV_64F).var()
     # print(f"FM-> {fm}")
     if fm < 600:
@@ -102,7 +103,7 @@ def edgesInside(img):
         aux = gaussBlur(aux)
         aux = clahe(aux)
     # Obtenemos los bordes de la imagen
-    edges = cv2.Canny(aux, dp.CANNY_TRHES1, dp.CANNY_TRHES2)
+    edges = cv2.Canny(aux, CANNY_TRHES1, CANNY_TRHES2)
 
     return edges
 
@@ -231,10 +232,10 @@ def cropCircles(img: cv2.Mat, ncoins=1, DEBUG=False) -> list[cv2.Mat]:
         morphed,
         cv2.HOUGH_GRADIENT,
         cdp,
-        minDist=dp.IM_SIZE_ADJ,
-        param1=dp.HCIRCLES_PAR1,
-        param2=dp.HCIRCLES_PAR2,
-        minRadius=dp.HCIRCLES_MINRAD,
+        minDist=IM_SIZE_ADJ,
+        param1=HCIRCLES_PAR1,
+        param2=HCIRCLES_PAR2,
+        minRadius=HCIRCLES_MINRAD,
         maxRadius=2000,
     )
 
@@ -295,8 +296,8 @@ def getOCR(img: cv2.Mat, DEBUG=False, n_reads=1) -> list[str]:
     reader = easyocr.Reader(["en"])
     # Leemos la moneda
     output = reader.readtext(img)
-    M = cv2.getRotationMatrix2D((h / 2, w / 2), 360 / dp.OCR_N_READS, 1)
-    for _ in range(dp.OCR_N_READS - 1):
+    M = cv2.getRotationMatrix2D((h / 2, w / 2), 360 / OCR_N_READS, 1)
+    for _ in range(OCR_N_READS - 1):
         rotated = cv2.warpAffine(img, M, (w, h))
         output += reader.readtext(rotated)
 
@@ -305,7 +306,7 @@ def getOCR(img: cv2.Mat, DEBUG=False, n_reads=1) -> list[str]:
     print(f"Good words ->", end=" ")
     for tupla in output:
         cord, palabra, percent = tupla
-        if percent > dp.OCR_MINRATE:
+        if percent > OCR_MINRATE:
             # -- DEBUG --
             #  Muestra  donde detecto los caracteres
             x_min, y_min = [int(min(idx)) for idx in zip(*cord)]
@@ -330,7 +331,7 @@ def huMoments(img: cv2.Mat) -> list:
     # Calculamos los momentos estadisticos hasta los de primera orden
     M = cv2.moments(gray, False)
     # Calculamos los momentos de Hu y nos quedamos con los dos primeros
-    Hm = cv2.HuMoments(M).flatten()[0 : dp.N_HUMOMS]
+    Hm = cv2.HuMoments(M).flatten()[0:N_HUMOMS]
     return Hm
 
 
@@ -340,7 +341,7 @@ def keyPoints(img: cv2.Mat, DEBUG=False):
     kps_img = gaussBlur(kps_img)
 
     kps = cv2.goodFeaturesToTrack(
-        np.float32(kps_img), dp.KP_MAXCORNERS, dp.KP_QUALITY, dp.KP_MINDIST
+        np.float32(kps_img), KP_MAXCORNERS, KP_QUALITY, KP_MINDIST
     )
     kps_img = cv2.cvtColor(kps_img, cv2.COLOR_GRAY2BGR)
 
@@ -358,7 +359,7 @@ def keyPoints(img: cv2.Mat, DEBUG=False):
 
     h = img.shape[0]
     c = int(h / 2)
-    dist = np.sqrt((x - c) ** 2 + (y - c) ** 2) * dp.IM_SIZE_ADJ / h
+    dist = np.sqrt((x - c) ** 2 + (y - c) ** 2) * IM_SIZE_ADJ / h
     angle = math.degrees(math.atan2(y - c, x - c)) % 360
     return len(kps), x, y, dist, angle
 
@@ -372,7 +373,7 @@ def getLines(edges: cv2.Mat, DEBUG=False):
     if lines is not None:
         morphed = cv2.cvtColor(morphed, cv2.COLOR_GRAY2BGR)
 
-        m = min(len(lines), dp.NUM_LINES)
+        m = min(len(lines), NUM_LINES)
         if DEBUG:
             sorted_lines = sorted(
                 lines,
@@ -397,7 +398,7 @@ def getLines(edges: cv2.Mat, DEBUG=False):
 def normalize_orientation(dist, angle, img: cv2.Mat):
     h, w = img.shape
     cy, cx = h / 2, w / 2
-    if dist > dp.MIN_CENTERS_DIST:
+    if dist > MIN_CENTERS_DIST:
         M = cv2.getRotationMatrix2D((cx, cy), angle + 180, 1)
         rotated = cv2.warpAffine(img, M, (w, h))
     else:
@@ -412,7 +413,7 @@ def center_of_gravity_info(img: cv2.Mat, DEBUG=False):
 
     cmy, cmx = ndi.center_of_mass(img)
 
-    dist = np.sqrt((cx - cmx) ** 2 + (cy - cmy) ** 2) * dp.IM_SIZE_ADJ / h
+    dist = np.sqrt((cx - cmx) ** 2 + (cy - cmy) ** 2) * IM_SIZE_ADJ / h
     angle = math.degrees(math.atan2(cy - cmy, cx - cmx)) % 360
 
     if DEBUG:

@@ -1,4 +1,3 @@
-from importlib.metadata import files
 import math
 import os
 from pathlib import Path
@@ -6,51 +5,56 @@ from difflib import SequenceMatcher as SM
 import numpy as np
 import json
 
+from config_params import *
+
 PROJECT_ROOT = Path(__file__).parents[1]
 
 FILE_PATHS = PROJECT_ROOT / "conf" / "path_to_data.conf"
-FILE_CSV = PROJECT_ROOT / "data" / "DataSet.csv"
+FILE_ARFF = PROJECT_ROOT / "data" / "DataSet.arff"
+FILE_MODEL = PROJECT_ROOT / "data" / "models" / "SimpleLogistic.model"
 FILE_COIN_INFO = PROJECT_ROOT / "conf" / "coin_info.conf"
 FILE_COIN_WORDS = PROJECT_ROOT / "conf" / "coin_words.conf"
 OUT_FOLDER = PROJECT_ROOT / "data"
 RINGS_FOLDER = "data/conf/RINGS"
 
-IM_SIZE_ADJ = 512
-RING_SIZE = 0.75
 
-CANNY_TRHES1 = 50
-CANNY_TRHES2 = 100
+# IM_SIZE_ADJ = 512
+# RING_SIZE = 0.75
 
-HCIRCLES_KERNEL_RATIO = 100
-HCIRCLES_DP = 4
-HCIRCLES_PAR1 = 50
-HCIRCLES_PAR2 = 100
-HCIRCLES_MINRAD = 127
+# CANNY_TRHES1 = 50
+# CANNY_TRHES2 = 100
 
-HLINES_KERNEL_RATIO = 35
+# HCIRCLES_KERNEL_RATIO = 100
+# HCIRCLES_DP = 4
+# HCIRCLES_PAR1 = 50
+# HCIRCLES_PAR2 = 100
+# HCIRCLES_MINRAD = 127
 
-OCR_MINRATE = 0.8
-OCR_N_READS = 4
+# HLINES_KERNEL_RATIO = 35
 
-N_HUMOMS = 7
+# OCR_MINRATE = 0.65
+# OCR_N_READS = 4
 
-KP_MAXCORNERS = 1000
-KP_QUALITY = 0.1
-KP_MINDIST = 5
+# N_HUMOMS = 7
 
-NUM_LINES = 20
+# KP_MAXCORNERS = 1000
+# KP_QUALITY = 0.1
+# KP_MINDIST = 5
 
-MIN_CENTERS_DIST = 500
+# NUM_LINES = 20
 
-SIFT_PERCENTAGE_FOR_GP = 0.7
+# MIN_CENTERS_DIST = 500
 
-LETTER_BASED_OCR = False
+# SIFT_PERCENTAGE_FOR_GP = 0.7
+
+# LETTER_BASED_OCR = True
+# WORD_BASED_OCR = True
 
 if LETTER_BASED_OCR:
     OCR_CHARS = [
         chr(i) for i in [*range(ord("A"), ord("Z") + 1), *range(ord("0"), ord("9") + 1)]
     ]
-else:
+if WORD_BASED_OCR:
     with open(FILE_COIN_WORDS, "r") as f:
         COIN_WORDS = set(f.readlines())
 
@@ -137,10 +141,10 @@ def initData():
     }
     if LETTER_BASED_OCR:
         for letter in OCR_CHARS:
-            data.update({f"OCR_{letter}": []})
+            data.update({f"OCR_LB_{letter}": []})
         for number in range(10):
-            data.update({f"OCR_{number}": []})
-    else:
+            data.update({f"OCR_LB_{number}": []})
+    if WORD_BASED_OCR:
         for word in COIN_WORDS:
             data.update({f"OCR_{word[:-1]}": []})
 
@@ -182,8 +186,8 @@ def appendOcrData(ocr_data, data):
             for ocr in ocr_data:
                 if ch in ocr:
                     count += 1
-            data[f"OCR_{ch}"] = count
-    else:
+            data[f"OCR_LB_{ch}"] = count
+    if WORD_BASED_OCR:
         for word in COIN_WORDS:
             m = 0
             for ocr in ocr_data:

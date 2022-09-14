@@ -1,5 +1,7 @@
 from im_processing import *
+from config_params import *
 from im_classifier import extractData
+from machine_learning import add_to_dataset, find_from_dataset
 import data_processing as dp
 
 import traceback
@@ -10,6 +12,7 @@ import pandas as pd
 import json
 
 import cv2
+import sklweka.jvm as jvm
 
 
 def readPaths():
@@ -101,7 +104,7 @@ def findCoins(img_paths):
 
 def findCoin(img, ncoins=1):
     # Extraemos datos de la moneda
-    data = extractData(img, ncoins)
+    im_data = extractData(img, ncoins)
 
     # -- DEBUG --
     # Imprime los datos por pantalla
@@ -109,7 +112,15 @@ def findCoin(img, ncoins=1):
 
     # -- POR COMPLETAR --
     # Añadir identificacion por aprendizaje
-    coin_class = get_class(data)
+    data = dp.initData()
+    for key in data:
+        if im_data.get(key) is not None:
+            data[key].append(im_data[key])
+        else:
+            data[key].append(0)
+
+    df = pd.DataFrame.from_dict(data)
+    coin_class = find_from_dataset(df)
     info = dp.get_coin_info(coin_class)
 
     if not info:
@@ -152,17 +163,21 @@ def addCoins(img_paths):
             else:
                 class_id, nc = dp.getClass(pth)
 
-            im_data = extractData(pth, class_id, nc)
+            im_data = extractData(pth, nc)
+            im_data["CLASS"] = class_id
 
             for key in data:
                 if im_data.get(key) is not None:
                     data[key].append(im_data[key])
                 else:
-                    data[key].append(None)
+                    data[key].append(0)
 
-        # Escribimos los datos en el archivo csv
+        # Escribimos los datos en el archivo arff
         # print(data)
-        pd.DataFrame.from_dict(data).to_csv(dp.FILE_CSV)
+
+        df = pd.DataFrame.from_dict(data)
+        add_to_dataset(df)
+
         end_time = time.time()
         print(f"TIME ELAPSED: {round(end_time-start_time)}")
         # -- POR COMPLETAR --
@@ -255,4 +270,10 @@ def processCommand():
 
 
 if __name__ == "__main__":
-    processCommand()
+    try:
+        jvm.start()
+        processCommand()
+    except Exception as e:
+        print(traceback.format_exc())
+    finally:
+        jvm.stop()
