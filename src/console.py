@@ -86,11 +86,11 @@ def findCoins(img_paths):
             # Busca una moneda en la imaegn
             info = findCoin(pth, nc)
             if info:
-                print(
-                    "La moneda en la imagen "
-                    + pth.split("/")[-1]
-                    + f" equivale a {info}"
-                )
+                # print(
+                #     "La moneda en la imagen "
+                #     + pth.split("/")[-1]
+                #     + f" equivale a {info}"
+                # )
                 result += str(info) + ", "
 
             else:
@@ -192,16 +192,16 @@ def addCoins(img_paths):
 
 def setInfo(args):
     if len(args) < 2:
-        print("Error: Seguir formato -> set-info CLASS NAME DESCRIPTION URL")
+        print("Error: Seguir formato -> set-info CLASS NAME YEAR DESCRIPTION URL")
         return
 
     classId = args[0]
-    info = {"NAME": args[1], "DESCRIPTION": args[2], "URL": args[3]}
+    info = {"NAME": args[1], "YEAR": args[2], "DESCRIPTION": args[3], "URL": args[4]}
 
-    data = dp.get_coin_info(classId)
-
+    with open(dp.FILE_COIN_INFO, "r") as f:
+        data = json.load(f)
+    data.update({classId: info})
     with open(dp.FILE_COIN_INFO, "w") as f:
-        data.update({classId: info})
         json.dump(data, f)
 
     print(f"Añadida la información {info} a la clase {classId}")

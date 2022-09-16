@@ -1,4 +1,3 @@
-from cmath import exp
 from constants import messages as msg, colors
 from windows.Info_Window import Info_Window
 from windows.Set_Info_Window import Set_Info_Window

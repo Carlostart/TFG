@@ -1,7 +1,5 @@
 import os
 import pickle
-import sklweka.jvm as jvm
-import traceback
 import arff
 
 import data_processing as dp
