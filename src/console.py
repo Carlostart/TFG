@@ -64,6 +64,7 @@ def setImg(args):
 
 # Busca todas las imágenes introducidas
 def findCoins(img_paths):
+
     # Si no se especifica ninguna dirección, identifica la anteriormente seleccionada
     if img_paths == []:
         img_paths = readPaths()
@@ -78,6 +79,9 @@ def findCoins(img_paths):
 
     img_paths = dp.getFilesInFolders(img_paths)
     result = "["
+
+    # Abrirmos la maquina virtual de java
+    jvm.start()
     # Buscamos todas las monedas
     for pth in img_paths:
         try:
@@ -141,7 +145,7 @@ def addCoins(img_paths):
         if img_paths == []:
             print(
                 "Añade información de la moneda:\n"
-                + "add PATH_1 PATH_2 ... PATH_N\n"
+                + "add PATH_1 PATH_2 ... PATH_N (CLASS_NAME)\n"
                 + "Se pueden seleccionar carpetas"
             )
             return
@@ -154,6 +158,8 @@ def addCoins(img_paths):
     try:
         start_time = time.time()
 
+        # Abrirmos la maquina virtual de java
+        jvm.start()
         img_paths = dp.getFilesInFolders(img_paths)
         # Extraemos datos de todas la imagenes especificadas
         data = dp.initData()
@@ -271,7 +277,6 @@ def processCommand():
 
 if __name__ == "__main__":
     try:
-        jvm.start()
         processCommand()
     except Exception as e:
         print(traceback.format_exc())

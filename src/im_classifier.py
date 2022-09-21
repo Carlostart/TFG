@@ -73,7 +73,7 @@ def extractData(img_path: str, ncoins=1) -> dict[str, list]:
             print()
         # Lectura de caracteres
         if EXTRACT_OCR:
-            data_ocr = ip.getOCR(image, DEBUG)
+            data_ocr = ip.getOCR(reduced, DEBUG)
             dp.appendOcrData(data_ocr, data)
         # Obtenemos info delas esquinas
         if EXTRACT_KEYPWR:
