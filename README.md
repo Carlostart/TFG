@@ -1,1 +1,1 @@
-# TFG de identificador de monedas de 2€
+# 2€ Coin identification with traditional Computer Vision and Machine Learning
